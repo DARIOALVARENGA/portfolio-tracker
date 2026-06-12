@@ -494,6 +494,10 @@ async function fetchPx(force=false){
   }
 }
 
+function normPrecio(pr,tipo){if(!pr)return pr;if(tipo==='Bono'||tipo==='ON')return pr/100;return pr;}
+function valorActualARS(pr,cant,moneda,tipo){if(!pr||!cant)return null;return normPrecio(pr,tipo)*cant;}
+function precioCostoARS(p){const tc2=p.compras.reduce((s,x)=>s+x.cant,0);if(!tc2)return 0;return p.compras.reduce((s,x)=>s+toARS(x.neto,x.moneda,x.conc),0)/tc2;}
+
 let clients={},activeId=null;
 const TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON'};
 const TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Otro':'#5F5E5A'};
