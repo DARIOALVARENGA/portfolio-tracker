@@ -484,23 +484,19 @@ IMPORTANTE:
 - Respondé SOLO con JSON puro sin markdown ni texto adicional:
 {"TICKER1":precio1,"TICKER2":precio2}`;
   try{
-    const r=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
-    if(!r.ok){const errData=await r.json();throw new Error('API HTTP '+r.status+': '+JSON.stringify(errData));}
-    const data=await r.json();let txt='';
+    // Primera llamada: buscar precios con web search
+    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+    if(!r1.ok){const errData=await r1.json();throw new Error('API HTTP '+r1.status+': '+JSON.stringify(errData));}
+    const data1=await r1.json();
+    // Recolectar todo el contenido de la primera respuesta
+    const msgs=[{role:'user',content:prompt},{role:'assistant',content:data1.content}];
+    // Segunda llamada: forzar JSON puro
+    const r2=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[...msgs,{role:'user',content:'Ahora respondé ÚNICAMENTE con el objeto JSON con los precios encontrados, sin ningún texto adicional, sin markdown, solo el JSON puro: {"TICKER":precio}'}]})});
+    if(!r2.ok){const errData=await r2.json();throw new Error('API HTTP '+r2.status+': '+JSON.stringify(errData));}
+    const data=await r2.json();let txt='';
     for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
-    // Buscar bloque JSON en la respuesta
     txt=txt.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
-    const s=txt.indexOf('{'),e=txt.lastIndexOf('}');
-    if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
-    if(!txt){
-      // Si no hay texto buscar en tool results
-      for(const b of(data.content||[])){
-        if(b.type==='tool_result'||b.type==='mcp_tool_result'){
-          const t=(b.content||[]).find(x=>x.type==='text');
-          if(t){const s2=t.text.indexOf('{'),e2=t.text.lastIndexOf('}');if(s2!==-1&&e2!==-1){txt=t.text.slice(s2,e2+1);break;}}
-        }
-      }
-    }
+    const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
     const px=JSON.parse(txt);let cnt=0;
     for(const[tk,v]of Object.entries(px)){const p=parseFloat(v);if(!isNaN(p)&&p>0){pxC[tk.toUpperCase()]=p;cnt++;}}
     pxSt='ok';const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
