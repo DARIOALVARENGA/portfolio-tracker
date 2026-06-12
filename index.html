@@ -438,15 +438,18 @@ function toARSn(v,m){
   return v*tcHoy();
 }
 
-// Para valor actual de posición: el precio de IOL siempre está en ARS
-function valorActualARS(pr,cant,moneda,tipo){
-  if(!pr||!cant)return null;
-  // Bonos, ONs, Letras: precio IOL ya en pesos, multiplicar directamente
-  if(tipo==='Bono'||tipo==='ON'||tipo==='Letra')return pr*cant;
-  // Acciones y CEDEARs: precio IOL en pesos
-  if(moneda==='Pesos')return pr*cant;
-  // CEDEARs/Acciones en USD (poco común): convertir
-  return pr*cant;
+// Normaliza precio según tipo — bonos/ONs cotizan por VN100
+function normPrecio(pr,tipo){
+  if(!pr)return pr;
+  if(tipo==='Bono'||tipo==='ON')return pr/100;
+  return pr;
+}
+
+// Precio promedio de compra en ARS
+function precioCostoARS(p){
+  const tc2=p.compras.reduce((s,x)=>s+x.cant,0);
+  if(!tc2)return 0;
+  return p.compras.reduce((s,x)=>s+toARS(x.neto,x.moneda,x.conc),0)/tc2;
 }
 function isUSD(m){return m==='Dólares'||m==='US Dollar (Cable)'||m==='Dólares C.V. 7000';}
 
