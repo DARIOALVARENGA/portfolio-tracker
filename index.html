@@ -444,15 +444,9 @@ async function fetchPx(force=false){
   Object.values(clients).forEach(c=>{Object.keys(c.posiciones||{}).filter(t=>c.posiciones[t].cantTotal>0).forEach(t=>tks.add(t));});
   if(!tks.size){pxSt='idle';setPill('px','warn','Sin posiciones');g('px-st').innerHTML='<div class="al al-warn">No hay posiciones abiertas. Importá boletos primero.</div>';return;}
   const lista=[...tks].join(', ');
-  const prompt=`Precios actuales mercado argentino en ARS para: ${lista}
-- Acciones/CEDEARs: precio en pesos en BYMA
-- Bonos (AL30,GD30,etc): pesos por VN100
-- Letras (S15Y6,etc): precio de mercado
-- ONs (RUCDO,etc): pesos por lámina
-Solo JSON puro: {"TICKER":precio}`;
+  const prompt=`Buscá en rava.com o bolsar.com los precios actuales en pesos argentinos (ARS) de estos tickers del mercado argentino: ${lista}. Respondé ÚNICAMENTE con JSON puro sin markdown: {"TICKER":precio_numero}`;
   try{
-    // Llamada única sin web_search
-    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,messages:[{role:'user',content:prompt}]})});
+    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
     if(!r1.ok){const errData=await r1.json();throw new Error('API HTTP '+r1.status+': '+JSON.stringify(errData));}
     const data=await r1.json();let txt='';
     for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
