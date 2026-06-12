@@ -439,28 +439,47 @@ function applyPx(){Object.values(clients).forEach(c=>{Object.keys(c.posiciones||
 async function fetchPx(force=false){
   if(pxSt==='loading')return;
   pxSt='loading';setPill('px','loading','↻ Cotizando…');
-  g('px-st').innerHTML='<div class="al al-info"><span class="spin">↻</span> Consultando cotizaciones del mercado argentino…</div>';
+  g('px-st').innerHTML='<div class="al al-info"><span class="spin">↻</span> Consultando cotizaciones de cierre…</div>';
   const tks=new Set();
   Object.values(clients).forEach(c=>{Object.keys(c.posiciones||{}).filter(t=>c.posiciones[t].cantTotal>0).forEach(t=>tks.add(t));});
   if(!tks.size){pxSt='idle';setPill('px','warn','Sin posiciones');g('px-st').innerHTML='<div class="al al-warn">No hay posiciones abiertas. Importá boletos primero.</div>';return;}
-  const lista=[...tks].join(', ');
-  const prompt=`Buscá en rava.com o bolsar.com los precios actuales en pesos argentinos (ARS) de estos tickers del mercado argentino: ${lista}. Respondé ÚNICAMENTE con JSON puro sin markdown: {"TICKER":precio_numero}`;
   try{
-    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
-    if(!r1.ok){const errData=await r1.json();throw new Error('API HTTP '+r1.status+': '+JSON.stringify(errData));}
-    const data=await r1.json();let txt='';
-    for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
-    txt=txt.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
-    const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
-    const px=JSON.parse(txt);let cnt=0;
-    for(const[tk,v]of Object.entries(px)){const p=parseFloat(v);if(!isNaN(p)&&p>0){pxC[tk.toUpperCase()]=p;cnt++;}}
-    pxSt='ok';const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    setPill('px','ok',cnt+' precios · '+now);g('px-src').style.display='inline';
-    g('px-st').innerHTML=`<div class="al al-ok">✓ <strong>${cnt} activos</strong> cotizados · ${now}</div>`;
+    // Traer acciones+CEDEARs y bonos en paralelo
+    const [rAcc,rBon]=await Promise.allSettled([
+      fetch('https://api.argentinadatos.com/v1/cotizaciones/acciones'),
+      fetch('https://api.argentinadatos.com/v1/finanzas/bonos')
+    ]);
+    let cnt=0;
+    // Procesar acciones y CEDEARs
+    if(rAcc.status==='fulfilled'&&rAcc.value.ok){
+      const acc=await rAcc.value.json();
+      acc.forEach(a=>{
+        const tk=(a.simbolo||a.ticker||'').toUpperCase();
+        const px=parseFloat(a.ultimoPrecio||a.precio||a.ultimo||0);
+        if(tk&&px>0&&tks.has(tk)){pxC[tk]=px;cnt++;}
+      });
+    }
+    // Procesar bonos
+    if(rBon.status==='fulfilled'&&rBon.value.ok){
+      const bon=await rBon.value.json();
+      bon.forEach(b=>{
+        const tk=(b.simbolo||b.ticker||'').toUpperCase();
+        const px=parseFloat(b.ultimoPrecio||b.precio||b.ultimo||0);
+        if(tk&&px>0&&tks.has(tk)){pxC[tk]=px;cnt++;}
+      });
+    }
+    pxSt='ok';
+    const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const faltantes=[...tks].filter(t=>!pxC[t]);
+    setPill('px','ok',cnt+' precios · '+now);
+    g('px-src').style.display='inline';
+    let msg=`<div class="al al-ok">✓ <strong>${cnt} activos</strong> con precio de cierre · ${now}</div>`;
+    if(faltantes.length)msg+=`<div class="al al-warn">Sin precio: ${faltantes.join(', ')} — ingresalos manualmente.</div>`;
+    g('px-st').innerHTML=msg;
     applyPx();renderAll();renderPG();scheduleSave();
   }catch(err){
     pxSt='error';setPill('px','err','Error al cotizar');
-    g('px-st').innerHTML=`<div class="al al-warn">⚠ ${err.message}<br><small>Detalle: ${err.stack||err.toString()}</small></div>`;
+    g('px-st').innerHTML=`<div class="al al-warn">⚠ ${err.message}</div>`;
   }
 }
 
