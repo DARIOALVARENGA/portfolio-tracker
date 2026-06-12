@@ -444,7 +444,11 @@ async function fetchPx(force=false){
   Object.values(clients).forEach(c=>{Object.keys(c.posiciones||{}).filter(t=>c.posiciones[t].cantTotal>0).forEach(t=>tks.add(t));});
   if(!tks.size){pxSt='idle';setPill('px','warn','Sin posiciones');g('px-st').innerHTML='<div class="al al-warn">No hay posiciones abiertas. Importá boletos primero.</div>';return;}
   try{
-    const r=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy');
+    const r=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({tickers:[...tks]})
+    });
     if(!r.ok)throw new Error('HTTP '+r.status);
     const precios=await r.json();
     let cnt=0;
