@@ -790,7 +790,79 @@ function posTable(pos,precios,isCon){
 }
 
 function renderRes({posiciones,precios,isCon}){const pos=Object.values(posiciones).filter(p=>p.cantTotal>0);if(!pos.length){g('res-b').innerHTML='<div class="empty"><p>Sin posiciones abiertas</p></div>';return;}g('res-b').innerHTML=posTable(pos,precios,isCon);}
-function renderPos(){const{posiciones,precios,isCon}=getData();const ft=g('f-tp')?.value||'',fk=(g('f-tk')?.value||'').toUpperCase();const pos=Object.values(posiciones).filter(p=>p.cantTotal>0&&(!ft||p.tipo===ft)&&(!fk||p.ticker.includes(fk)));if(!pos.length){g('pos-b').innerHTML='<div class="empty"><p>Sin resultados</p></div>';return;}g('pos-b').innerHTML=posTable(pos,precios,isCon);}
+function renderPos(){
+  const{posiciones,precios,isCon}=getData();
+  const ft=g('f-tp')?.value||'',fk=(g('f-tk')?.value||'').toUpperCase();
+  const pos=Object.values(posiciones).filter(p=>p.cantTotal>0&&(!ft||p.tipo===ft)&&(!fk||p.ticker.includes(fk)));
+  if(!pos.length){g('pos-b').innerHTML='<div class="empty"><p>Sin resultados</p></div>';return;}
+  
+  // Agrupar por tipo
+  const grupos={};
+  pos.forEach(p=>{if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
+  const orden=['Acción','CEDEAR','Bono','ON','Letra','Otro'];
+  
+  let h='<div class="tw"><table><thead><tr>';
+  h+='<th>Ticker</th><th>Descripción</th>';
+  if(isCon)h+='<th>Cliente</th>';
+  h+='<th style="text-align:right">Nominales</th><th style="text-align:right">Precio</th><th style="text-align:right">Valor Actual</th><th style="text-align:right">Valor Inicial</th><th style="text-align:right">P.Prom.Compra</th><th style="text-align:right">Flujos ARS</th><th style="text-align:right">Rendimiento</th><th style="text-align:right">%</th>';
+  h+='</tr></thead><tbody>';
+
+  orden.filter(t=>grupos[t]).forEach(tipo=>{
+    const items=grupos[tipo].sort((a,b)=>(b.costoTotalARS||0)-(a.costoTotalARS||0));
+    // Fila de grupo
+    h+=`<tr><td colspan="${isCon?11:10}" style="background:var(--sf2);padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)">`;
+    h+=`<span class="${pc(tipo)}" style="margin-right:6px">${tipo}</span>${items.length} posición${items.length!==1?'es':''}</td></tr>`;
+    
+    items.forEach(p=>{
+      const pr=precios[p.ticker];
+      const iU=isUSD(p.moneda)&&p.moneda!=='Dólares C.V. 7000';
+      const valActARS=pr?toARSn(pr*p.cantTotal,p.moneda):null;
+      const valIniARS=p.costoTotalARS||0;
+      const fl=p.flujosARS||0;
+      const ganARS=valActARS!=null?valActARS+fl-valIniARS:null;
+      const rentPct=valIniARS>0&&ganARS!=null?(ganARS/valIniARS)*100:null;
+      const venc=parseLetra(p.ticker);
+      const dv=venc?Math.round((venc-new Date())/864e5):null;
+      const vtag=dv!==null&&dv>=0&&dv<=30?` <span class="vt">${dv}d</span>`:'';
+      let cn='';
+      if(isCon){const f=Object.values(clients).find(c=>c.posiciones&&c.posiciones[p.ticker]&&c.posiciones[p.ticker].cantTotal>0);cn=f?f.name.split(' ')[0]:'';}
+      
+      h+=`<tr>`;
+      h+=`<td><span style="font-weight:600;font-size:12px">${p.ticker}</span>${vtag}</td>`;
+      h+=`<td style="color:var(--t2);font-size:11px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.desc||''}</td>`;
+      if(isCon)h+=`<td><span class="pill pcl">${cn}</span></td>`;
+      h+=`<td class="num" style="text-align:right">${p.cantTotal.toLocaleString('es-AR')}</td>`;
+      h+=`<td class="num" style="text-align:right">${pr?(iU?fU(pr):fP(pr)):'<span class="dim">—</span>'}</td>`;
+      h+=`<td class="num" style="text-align:right;font-weight:500">${valActARS!=null?fP(valActARS):'<span class="dim">—</span>'}</td>`;
+      h+=`<td class="num" style="text-align:right">${fP(valIniARS)}</td>`;
+      h+=`<td class="num" style="text-align:right">${iU?fU(p.precioCosto):fP(p.precioCosto)}</td>`;
+      h+=`<td class="num ${fl>0?'pos':'dim'}" style="text-align:right">${fl>0?fP(fl):'—'}</td>`;
+      h+=`<td class="num ${ganARS!=null?cc(ganARS):''}" style="text-align:right;font-weight:600">${ganARS!=null?fP(ganARS):'—'}</td>`;
+      h+=`<td class="${rentPct!=null?cc(rentPct):''}" style="text-align:right;font-weight:600">${rentPct!=null?fPct(rentPct):'—'}</td>`;
+      h+=`</tr>`;
+    });
+
+    // Fila de subtotal por grupo
+    const totIni=items.reduce((s,p)=>s+(p.costoTotalARS||0),0);
+    const totAct=items.reduce((s,p)=>{const pr=precios[p.ticker];return s+(pr?toARSn(pr*p.cantTotal,p.moneda):0);},0);
+    const totFl=items.reduce((s,p)=>s+(p.flujosARS||0),0);
+    const totGan=totAct+totFl-totIni;
+    const totPct=totIni>0?(totGan/totIni)*100:0;
+    h+=`<tr style="background:var(--sf);border-top:1px solid var(--bd2)">`;
+    h+=`<td colspan="${isCon?3:2}" style="font-size:11px;color:var(--t3);padding-left:14px">Subtotal ${tipo}</td>`;
+    h+=`<td></td><td></td>`;
+    h+=`<td class="num" style="text-align:right;font-weight:600">${totAct?fP(totAct):'—'}</td>`;
+    h+=`<td class="num" style="text-align:right">${fP(totIni)}</td>`;
+    h+=`<td></td>`;
+    h+=`<td class="num ${totFl>0?'pos':'dim'}" style="text-align:right">${totFl>0?fP(totFl):'—'}</td>`;
+    h+=`<td class="num ${cc(totGan)}" style="text-align:right;font-weight:600">${fP(totGan)}</td>`;
+    h+=`<td class="${cc(totPct)}" style="text-align:right;font-weight:600">${fPct(totPct)}</td>`;
+    h+=`</tr>`;
+  });
+
+  h+='</tbody></table></div>';
+  g('pos-b').innerHTML=h;
+}
 
 function renderHist(){
   const{opsCerradas,isCon}=getData();
