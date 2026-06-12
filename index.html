@@ -444,30 +444,14 @@ async function fetchPx(force=false){
   Object.values(clients).forEach(c=>{Object.keys(c.posiciones||{}).filter(t=>c.posiciones[t].cantTotal>0).forEach(t=>tks.add(t));});
   if(!tks.size){pxSt='idle';setPill('px','warn','Sin posiciones');g('px-st').innerHTML='<div class="al al-warn">No hay posiciones abiertas. Importá boletos primero.</div>';return;}
   try{
-    // Traer acciones+CEDEARs y bonos en paralelo
-    const [rAcc,rBon]=await Promise.allSettled([
-      fetch('https://api.argentinadatos.com/v1/cotizaciones/acciones'),
-      fetch('https://api.argentinadatos.com/v1/finanzas/bonos')
-    ]);
+    const r=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const precios=await r.json();
     let cnt=0;
-    // Procesar acciones y CEDEARs
-    if(rAcc.status==='fulfilled'&&rAcc.value.ok){
-      const acc=await rAcc.value.json();
-      acc.forEach(a=>{
-        const tk=(a.simbolo||a.ticker||'').toUpperCase();
-        const px=parseFloat(a.ultimoPrecio||a.precio||a.ultimo||0);
-        if(tk&&px>0&&tks.has(tk)){pxC[tk]=px;cnt++;}
-      });
-    }
-    // Procesar bonos
-    if(rBon.status==='fulfilled'&&rBon.value.ok){
-      const bon=await rBon.value.json();
-      bon.forEach(b=>{
-        const tk=(b.simbolo||b.ticker||'').toUpperCase();
-        const px=parseFloat(b.ultimoPrecio||b.precio||b.ultimo||0);
-        if(tk&&px>0&&tks.has(tk)){pxC[tk]=px;cnt++;}
-      });
-    }
+    tks.forEach(tk=>{
+      const px=precios[tk]||precios[tk.toLowerCase()];
+      if(px&&parseFloat(px)>0){pxC[tk]=parseFloat(px);cnt++;}
+    });
     pxSt='ok';
     const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
     const faltantes=[...tks].filter(t=>!pxC[t]);
