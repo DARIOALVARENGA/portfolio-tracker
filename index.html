@@ -488,8 +488,19 @@ IMPORTANTE:
     if(!r.ok){const errData=await r.json();throw new Error('API HTTP '+r.status+': '+JSON.stringify(errData));}
     const data=await r.json();let txt='';
     for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
+    // Buscar bloque JSON en la respuesta
     txt=txt.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
-    const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
+    const s=txt.indexOf('{'),e=txt.lastIndexOf('}');
+    if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
+    if(!txt){
+      // Si no hay texto buscar en tool results
+      for(const b of(data.content||[])){
+        if(b.type==='tool_result'||b.type==='mcp_tool_result'){
+          const t=(b.content||[]).find(x=>x.type==='text');
+          if(t){const s2=t.text.indexOf('{'),e2=t.text.lastIndexOf('}');if(s2!==-1&&e2!==-1){txt=t.text.slice(s2,e2+1);break;}}
+        }
+      }
+    }
     const px=JSON.parse(txt);let cnt=0;
     for(const[tk,v]of Object.entries(px)){const p=parseFloat(v);if(!isNaN(p)&&p>0){pxC[tk.toUpperCase()]=p;cnt++;}}
     pxSt='ok';const now=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
