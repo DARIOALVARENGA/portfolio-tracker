@@ -184,7 +184,8 @@ select option{background:var(--bg3)}input[type=file]{display:none}
       <div class="nav">
         <button class="nb on" onclick="showTab('dash')">Dashboard</button>
         <button class="nb" onclick="showTab('pos')">Posiciones</button>
-        <button class="nb" onclick="showTab('hist')">Historial</button>
+        <button class="nb" onclick="showTab('hist')">Op. Cerradas</button>
+        <button class="nb" onclick="showTab('boletos')">Boletos</button>
         <button class="nb" onclick="showTab('flujos')">Flujos</button>
         <button class="nb" onclick="showTab('config')">Configurar</button>
       </div>
@@ -249,6 +250,9 @@ select option{background:var(--bg3)}input[type=file]{display:none}
       </div>
       <div id="hist-b"><div class="empty"><p>Sin operaciones cerradas</p></div></div>
     </div>
+  </div>
+
+  <div id="tab-boletos" class="tp">
     <div class="card">
       <div class="ch"><span class="ct">Detalle de boletos</span>
         <div style="display:flex;gap:5px">
@@ -702,6 +706,8 @@ function calcC(c){
   const today=new Date().toISOString().substring(0,10);
   const flujos=c.flujos||[];
   const fByTk={};flujos.forEach(f=>{if(!fByTk[f.ticker])fByTk[f.ticker]={ars:0,items:[]};fByTk[f.ticker].ars+=f.importeARS;fByTk[f.ticker].items.push(f);});
+  // Ordenar boletos por fecha antes de calcular
+  c.boletos.sort((a,b)=>a.conc.localeCompare(b.conc));
   c.boletos.forEach(b=>{if(!c.posiciones[b.ticker])c.posiciones[b.ticker]={ticker:b.ticker,desc:b.desc,tipo:b.ta,moneda:b.moneda,cantTotal:0,compras:[],ventas:[]};const p=c.posiciones[b.ticker];if(b.tipo==='COMPRA'){p.cantTotal+=b.cant;p.compras.push({...b});}else if(b.tipo==='VENTA'){p.cantTotal-=b.cant;p.ventas.push({...b});}});
   Object.values(c.posiciones).forEach(p=>{
     if(Math.abs(p.cantTotal)<0.001)p.cantTotal=0;
@@ -709,9 +715,9 @@ function calcC(c){
     p.precioCosto=tc2>0?p.compras.reduce((s,x)=>s+x.neto,0)/tc2:0;
     p.costoTotal=p.compras.reduce((s,x)=>s+x.neto,0);
     // Costo ARS: usar FIFO para descontar lo vendido
-    const colaC=p.compras.map(x=>({...x,cr:x.cant}));
-    let vendido=0;
-    (c.boletos.filter(b=>b.ticker===p.ticker&&b.tipo==='VENTA')||[]).forEach(v=>{
+    const colaC=p.compras.slice().sort((a,b)=>a.conc.localeCompare(b.conc)).map(x=>({...x,cr:x.cant}));
+    const ventasOrdenadas=(c.boletos.filter(b=>b.ticker===p.ticker&&b.tipo==='VENTA')||[]).slice().sort((a,b)=>a.conc.localeCompare(b.conc));
+    ventasOrdenadas.forEach(v=>{
       let cv=v.cant;
       for(let i=0;i<colaC.length&&cv>0;i++){if(colaC[i].cr<=0)continue;const m=Math.min(cv,colaC[i].cr);colaC[i].cr-=m;cv-=m;}
     });
@@ -734,8 +740,8 @@ function calcC(c){
   const tvs=[...new Set(c.boletos.filter(b=>b.tipo==='VENTA').map(b=>b.ticker))];
   tvs.forEach(ticker=>{
     const pos=c.posiciones[ticker];
-    const compras=c.boletos.filter(b=>b.ticker===ticker&&b.tipo==='COMPRA').sort((a,b)=>a.conc.localeCompare(b.conc));
-    const ventas=c.boletos.filter(b=>b.ticker===ticker&&b.tipo==='VENTA').sort((a,b)=>a.conc.localeCompare(b.conc));
+    const compras=c.boletos.filter(b=>b.ticker===ticker&&b.tipo==='COMPRA').slice().sort((a,b)=>a.conc.localeCompare(b.conc));
+    const ventas=c.boletos.filter(b=>b.ticker===ticker&&b.tipo==='VENTA').slice().sort((a,b)=>a.conc.localeCompare(b.conc));
     const cola=compras.map(x=>({...x,cr:x.cant}));
     ventas.forEach(v=>{
       let cv=v.cant,costoARS=0,costoOrig=0,tieneFX=false;
@@ -1007,8 +1013,9 @@ function exportHist(){
 function showTab(t){
   document.querySelectorAll('.tp').forEach(el=>el.classList.remove('on'));
   g('tab-'+t).classList.add('on');
-  document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('on',['dash','pos','hist','flujos','config'][i]===t));
+  document.querySelectorAll('.nb').forEach((b,i)=>b.classList.toggle('on',['dash','pos','hist','boletos','flujos','config'][i]===t));
   if(t==='config'){updateCfg();renderPG();}
+  if(t==='boletos')renderBol();
 }
 
 function setupDZ(dzId,handler){
