@@ -427,7 +427,23 @@ function tcFB(){return parseFloat(g('tc-mep').value)||1429.69;}
 function tcCable(){return parseFloat(g('tc-cable').value)||1478.19;}
 function tcHoy(){const fs=Object.keys(tcH).sort();return fs.length?tcH[fs[fs.length-1]]:tcFB();}
 function toARS(v,m,f){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*getTCd(f);}
-function toARSn(v,m){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*tcHoy();}
+function toARSn(v,m){
+  // Si el precio viene de IOL ya está en pesos — no convertir bonos/ONs
+  if(m==='Pesos')return v;
+  if(m==='US Dollar (Cable)')return v*tcCable();
+  return v*tcHoy();
+}
+
+// Para valor actual de posición: el precio de IOL siempre está en ARS
+function valorActualARS(pr,cant,moneda,tipo){
+  if(!pr||!cant)return null;
+  // Bonos, ONs, Letras: precio IOL ya en pesos, multiplicar directamente
+  if(tipo==='Bono'||tipo==='ON'||tipo==='Letra')return pr*cant;
+  // Acciones y CEDEARs: precio IOL en pesos
+  if(moneda==='Pesos')return pr*cant;
+  // CEDEARs/Acciones en USD (poco común): convertir
+  return pr*cant;
+}
 function isUSD(m){return m==='Dólares'||m==='US Dollar (Cable)'||m==='Dólares C.V. 7000';}
 
 let pxC={},pxSt='idle';
@@ -472,7 +488,7 @@ async function fetchPx(force=false){
 }
 
 let clients={},activeId=null;
-const TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON'};
+const TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON'};
 const TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Otro':'#5F5E5A'};
 const ACOLS=['#185FA5','#0F6E56','#534AB7','#854F0B','#A32D2D','#3B6D11','#712B13'];
 const MESC={E:1,F:2,M:3,A:4,Y:5,J:6,L:7,G:8,P:9,O:10,N:11,D:12};
@@ -737,7 +753,7 @@ function sa(id,v,cl){const el=g(id);if(el){el.textContent=v;el.className='rsv '+
 
 function renderKPIs({posiciones,opsCerradas,precios,flujos,isCon}){
   let tARS=0,cARS=0,cnt=0;
-  Object.values(posiciones).filter(p=>p.cantTotal>0).forEach(p=>{cnt++;const pr=precios[p.ticker];cARS+=p.costoTotalARS||toARSn(p.costoTotal,p.moneda);tARS+=pr?toARSn(pr*p.cantTotal,p.moneda):(p.costoTotalARS||toARSn(p.costoTotal,p.moneda));});
+  Object.values(posiciones).filter(p=>p.cantTotal>0).forEach(p=>{cnt++;const pr=precios[p.ticker];cARS+=p.costoTotalARS||toARSn(p.costoTotal,p.moneda);    tARS+=pr?valorActualARS(pr,p.cantTotal,p.moneda,p.tipo):(p.costoTotalARS||toARSn(p.costoTotal,p.moneda));});
   const gan=tARS-cARS,rp=cARS>0?(gan/cARS)*100:0;
   const rARS=opsCerradas.reduce((s,o)=>s+o.ganARS,0);const rUSD=opsCerradas.reduce((s,o)=>s+o.ganUSD,0);
   const flARS=flujos.reduce((s,f)=>s+f.importeARS,0);
