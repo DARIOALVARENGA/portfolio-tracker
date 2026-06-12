@@ -250,7 +250,7 @@ select option{background:var(--bg3)}input[type=file]{display:none}
       <div id="hist-b"><div class="empty"><p>Sin operaciones cerradas</p></div></div>
     </div>
     <div class="card">
-      <div class="ch"><span class="ct">Todos los boletos</span>
+      <div class="ch"><span class="ct">Detalle de boletos</span>
         <div style="display:flex;gap:5px">
           <select id="f-bop" onchange="renderBol()"><option value="">Todos</option><option value="COMPRA">Compras</option><option value="VENTA">Ventas</option></select>
           <input id="f-btk" placeholder="Ticker…" oninput="renderBol()" style="width:85px">
@@ -708,7 +708,15 @@ function calcC(c){
     const tc2=p.compras.reduce((s,x)=>s+x.cant,0);
     p.precioCosto=tc2>0?p.compras.reduce((s,x)=>s+x.neto,0)/tc2:0;
     p.costoTotal=p.compras.reduce((s,x)=>s+x.neto,0);
-    p.costoTotalARS=p.compras.reduce((s,x)=>s+toARS(x.neto,x.moneda,x.conc),0);
+    // Costo ARS: usar FIFO para descontar lo vendido
+    const colaC=p.compras.map(x=>({...x,cr:x.cant}));
+    let vendido=0;
+    (c.boletos.filter(b=>b.ticker===p.ticker&&b.tipo==='VENTA')||[]).forEach(v=>{
+      let cv=v.cant;
+      for(let i=0;i<colaC.length&&cv>0;i++){if(colaC[i].cr<=0)continue;const m=Math.min(cv,colaC[i].cr);colaC[i].cr-=m;cv-=m;}
+    });
+    // Solo sumar el costo de las unidades que quedan en cartera
+    p.costoTotalARS=colaC.reduce((s,x)=>s+toARS((x.neto/x.cant)*x.cr,x.moneda,x.conc),0);
     p.flujosARS=(fByTk[p.ticker]?.ars)||0;
     if(tc2>0){let dp=0;p.compras.forEach(x=>{dp+=(x.cant/tc2)*dds(x.conc,today)});p.diasProm=Math.round(dp);}else p.diasProm=0;
     if(p.cantTotal>0&&p.tipo==='Letra'&&letraVencida(p.ticker)){
@@ -731,10 +739,23 @@ function calcC(c){
     const cola=compras.map(x=>({...x,cr:x.cant}));
     ventas.forEach(v=>{
       let cv=v.cant,costoARS=0,costoOrig=0,tieneFX=false;
-      for(let i=0;i<cola.length&&cv>0;i++){if(cola[i].cr<=0)continue;const m=Math.min(cv,cola[i].cr);const cu=cola[i].neto/cola[i].cant;costoOrig+=m*cu;costoARS+=toARS(m*cu,cola[i].moneda,cola[i].conc);if(cola[i].moneda!==v.moneda)tieneFX=true;cola[i].cr-=m;cv-=m;}
-      const ingresoARS=toARS(v.neto,v.moneda,v.conc);const tcV=getTCd(v.conc);
+      for(let i=0;i<cola.length&&cv>0;i++){
+        if(cola[i].cr<=0)continue;
+        const m=Math.min(cv,cola[i].cr);
+        // Costo unitario en ARS al TC del día de esa compra
+        const netoUnitOrig=cola[i].neto/cola[i].cant;
+        const netoUnitARS=toARS(netoUnitOrig,cola[i].moneda,cola[i].conc);
+        costoOrig+=m*netoUnitOrig;
+        costoARS+=m*netoUnitARS;
+        if(cola[i].moneda!==v.moneda)tieneFX=true;
+        cola[i].cr-=m;cv-=m;
+      }
+      // Ingreso de la venta en ARS al TC del día de la venta
+      const ingresoARS=toARS(v.neto,v.moneda,v.conc);
+      const tcV=getTCd(v.conc);
       const flujosOp=(fByTk[ticker]?.items||[]).filter(f=>f.fecha<=v.conc).reduce((s,f)=>s+f.importeARS,0);
-      const ganARS=(ingresoARS+flujosOp)-costoARS;const ganUSD=ganARS/tcV;
+      const ganARS=(ingresoARS+flujosOp)-costoARS;
+      const ganUSD=ganARS/tcV;
       const rentPct=costoARS>0?(ganARS/costoARS)*100:0;
       const cr=compras[0];const dt=cr?dds(cr.conc,v.conc):1;
       c.opsCerradas.push({ticker,desc:pos?.desc||ticker,tipo:pos?.tipo||getTipo(ticker),moneda:v.moneda,fechaCompra:cr?.conc||'—',fechaVenta:v.conc,cant:v.cant,precioVenta:v.neto/v.cant,precioCosto:costoOrig/v.cant,costoARS,ingresoARS,flujosARS:flujosOp,ganARS,ganUSD,rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:false,tieneFX,tcUsado:tcV,fuenteIngreso:flujosOp>0?'Venta+CC':'Venta'});
@@ -911,8 +932,26 @@ function renderBol(){
   const{boletos}=getData();const fop=g('f-bop')?.value||'',ftk=(g('f-btk')?.value||'').toUpperCase();
   const b=boletos.filter(b=>(!fop||b.tipo===fop)&&(!ftk||b.ticker.includes(ftk))).sort((a,b)=>b.conc.localeCompare(a.conc));
   if(!b.length){g('bol-b').innerHTML='<div class="empty"><p>Sin boletos</p></div>';return;}
-  let h='<div class="tw"><table><thead><tr><th>#</th><th>Fecha</th><th>Op.</th><th>Ticker</th><th>Cant.</th><th>Precio</th><th>Neto</th><th>Moneda</th><th>TC fecha</th></tr></thead><tbody>';
-  b.forEach(r=>{const tc=isUSD(r.moneda)&&r.moneda!=='Dólares C.V. 7000'?getTCd(r.conc):null;h+=`<tr><td class="dim" style="font-size:10px;font-family:var(--m)">${r.num}</td><td class="num dim">${r.conc}</td><td><span class="pill ${r.tipo==='VENTA'?'psel':'pbuy'}">${r.tipo}</span></td><td><div class="tn">${r.ticker}</div><div class="td">${(r.desc||'').substring(0,22)}</div></td><td class="num">${r.cant.toLocaleString('es-AR')}</td><td class="num">${r.precio?r.precio.toLocaleString('es-AR',{maximumFractionDigits:4}):'—'}</td><td class="num">${isUSD(r.moneda)&&r.moneda!=='Dólares C.V. 7000'?fU(r.neto):fP(r.neto)}</td><td class="dim" style="font-size:10px">${r.moneda}</td><td class="num dim">${tc?'$'+Math.round(tc).toLocaleString('es-AR'):'—'}</td></tr>`;});
+  let h='<div class="tw"><table><thead><tr><th>#</th><th>Fecha</th><th>Op.</th><th>Ticker</th><th>Cant.</th><th>Precio</th><th>Neto original</th><th>Moneda</th><th>TC fecha</th><th style="text-align:right">Monto ARS</th><th style="text-align:right">Monto USD</th></tr></thead><tbody>';
+  b.forEach(r=>{
+    const tc=getTCd(r.conc);
+    const esUSD=isUSD(r.moneda)&&r.moneda!=='Dólares C.V. 7000';
+    const montoARS=esUSD?r.neto*tc:r.neto;
+    const montoUSD=esUSD?r.neto:r.neto/tc;
+    h+=`<tr>
+      <td class="dim" style="font-size:10px;font-family:var(--m)">${r.num}</td>
+      <td class="num dim">${r.conc}</td>
+      <td><span class="pill ${r.tipo==='VENTA'?'psel':'pbuy'}">${r.tipo}</span></td>
+      <td><div class="tn">${r.ticker}</div><div class="td">${(r.desc||'').substring(0,22)}</div></td>
+      <td class="num">${r.cant.toLocaleString('es-AR')}</td>
+      <td class="num">${r.precio?r.precio.toLocaleString('es-AR',{maximumFractionDigits:4}):'—'}</td>
+      <td class="num">${esUSD?fU(r.neto):fP(r.neto)}</td>
+      <td class="dim" style="font-size:10px">${r.moneda}</td>
+      <td class="num dim" style="text-align:right">${Math.round(tc).toLocaleString('es-AR')}</td>
+      <td class="num" style="text-align:right">${fP(montoARS)}</td>
+      <td class="num dim" style="text-align:right">${fU(montoUSD)}</td>
+    </tr>`;
+  });
   h+='</tbody></table></div>';g('bol-b').innerHTML=h;
 }
 
