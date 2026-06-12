@@ -444,56 +444,17 @@ async function fetchPx(force=false){
   Object.values(clients).forEach(c=>{Object.keys(c.posiciones||{}).filter(t=>c.posiciones[t].cantTotal>0).forEach(t=>tks.add(t));});
   if(!tks.size){pxSt='idle';setPill('px','warn','Sin posiciones');g('px-st').innerHTML='<div class="al al-warn">No hay posiciones abiertas. Importá boletos primero.</div>';return;}
   const lista=[...tks].join(', ');
-  const prompt=`Sos un sistema experto de cotizaciones del mercado de capitales argentino.
-Necesito los precios actuales de estos instrumentos: ${lista}
-
-INSTRUCCIONES DE BÚSQUEDA:
-Buscá los precios en estas fuentes en orden de prioridad:
-1. invertironline.com (IOL) - sección Mercado > Cotizaciones
-2. rava.com - sección Cotizaciones
-3. byma.com.ar - sección Cotizaciones
-4. bolsar.com
-
-REGLAS POR TIPO DE INSTRUMENTO:
-
-ACCIONES argentinas (GGAL, SUPV, EDN, YPFD, TECO2, BMA, COME, CRES, MIRG, PAMP, TGNO4, TGSU2, TRAN, VALO, TXAR, ALUA, BOLT, BPAT, BYMA, CADU, CAPX, CARC, CEPU, CGPA2, CTIO, DGCU2, DYCA, FERR, GAMI, GCDI, GBAN, GCHE, GCLA, GGAL, HARG, INVJ, IRSA, LEDE, LOMA, LONG, METR, MOLI, MORI, OEST, PATA, PELC, PGRO, POLL, RIGO, ROSE, SAMI, SEMI, SHCO, SUPV, TECO2, TGLT, TGNO4, TGSU2, TRAN, VALO, VALO, YPFD):
-- Precio en PESOS por acción
-- Usar precio de cierre del día o último disponible en BYMA
-
-CEDEARs (GOOGL, MSFT, AAPL, AMZN, META, NVDA, JPM, KO, WMT, MELI, BABA, GLOB, NU, BBD, GOLD, AKO, ARGT, DESP, VIST, GPRK, XOM, CVX, BAC, C, GS, AMD, INTC, TSLA, NFLX, DIS, PFE, MRNA, etc.):
-- Precio en PESOS por CEDEAR (no en USD)
-- Es el precio que cotiza en BYMA en pesos
-- NO convertir precio de NYSE a pesos manualmente
-
-BONOS SOBERANOS (AL29, AL30, AL35, AL41, GD29, GD30, GD35, GD38, GD41, GD46, AE38, DICP, DICA, etc.):
-- Precio en PESOS por lámina de VN100
-- Usar precio en pesos del mercado local (BYMA/MAE)
-
-LETRAS DEL TESORO (S15Y6, S27F6, S18Y6, S11Y6, S30Y6, S29G6, S12S6, etc.):
-- Precio en PESOS como valor de la letra (ej: 1050.50)
-- Es el precio de mercado secundario en BYMA
-
-OBLIGACIONES NEGOCIABLES (RUCDO, TLCMO, DNC7O, TLC1O, IRCFO, GNCXO, YMCIO, DNC5O, TLCPO, YCA6O, PAE2O, RPC2O, MRCAO, etc.):
-- Precio en PESOS por lámina
-- Buscar en MAE o BYMA segmento ONs
-
-IMPORTANTE:
-- Si un ticker no tiene precio disponible hoy, usá el último cierre disponible
-- Si no encontrás precio de ninguna fuente, omití ese ticker del JSON
-- NO inventes precios ni uses datos desactualizados de más de 3 días
-- Respondé SOLO con JSON puro sin markdown ni texto adicional:
-{"TICKER1":precio1,"TICKER2":precio2}`;
+  const prompt=`Precios actuales mercado argentino en ARS para: ${lista}
+- Acciones/CEDEARs: precio en pesos en BYMA
+- Bonos (AL30,GD30,etc): pesos por VN100
+- Letras (S15Y6,etc): precio de mercado
+- ONs (RUCDO,etc): pesos por lámina
+Solo JSON puro: {"TICKER":precio}`;
   try{
-    // Primera llamada: buscar precios con web search
-    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+    // Llamada única sin web_search
+    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     if(!r1.ok){const errData=await r1.json();throw new Error('API HTTP '+r1.status+': '+JSON.stringify(errData));}
-    const data1=await r1.json();
-    // Recolectar todo el contenido de la primera respuesta
-    const msgs=[{role:'user',content:prompt},{role:'assistant',content:data1.content}];
-    // Segunda llamada: forzar JSON puro
-    const r2=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,messages:[...msgs,{role:'user',content:'Ahora respondé ÚNICAMENTE con el objeto JSON con los precios encontrados, sin ningún texto adicional, sin markdown, solo el JSON puro: {"TICKER":precio}'}]})});
-    if(!r2.ok){const errData=await r2.json();throw new Error('API HTTP '+r2.status+': '+JSON.stringify(errData));}
-    const data=await r2.json();let txt='';
+    const data=await r1.json();let txt='';
     for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
     txt=txt.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
     const s=txt.indexOf('{'),e=txt.lastIndexOf('}');if(s!==-1&&e!==-1)txt=txt.slice(s,e+1);
