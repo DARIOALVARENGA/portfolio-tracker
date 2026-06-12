@@ -446,7 +446,7 @@ async function fetchPx(force=false){
   const lista=[...tks].join(', ');
   const prompt=`Buscá en rava.com o bolsar.com los precios actuales en pesos argentinos (ARS) de estos tickers del mercado argentino: ${lista}. Respondé ÚNICAMENTE con JSON puro sin markdown: {"TICKER":precio_numero}`;
   try{
-    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+    const r1=await fetch('https://anthropic-proxy-wll5.vercel.app/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
     if(!r1.ok){const errData=await r1.json();throw new Error('API HTTP '+r1.status+': '+JSON.stringify(errData));}
     const data=await r1.json();let txt='';
     for(const b of(data.content||[])){if(b.type==='text'){txt=b.text.trim();break;}}
