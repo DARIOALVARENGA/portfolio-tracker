@@ -448,6 +448,10 @@ function pc(t){return'pill '+({'Acción':'pa','Bono':'pb','CEDEAR':'pc','ON':'po
 function parseLetra(tk){if(!tk||tk[0]!=='S'||tk.length<5)return null;try{const d=parseInt(tk.substring(1,3)),mc=tk[3].toUpperCase(),ay=parseInt(tk[4]),m=MESC[mc];if(!m||isNaN(d)||isNaN(ay))return null;return new Date(2020+ay,m-1,d);}catch(e){return null;}}
 function letraVencida(tk){const v=parseLetra(tk);return v&&v<new Date();}
 function letraVStr(tk){const d=parseLetra(tk);return d?d.toISOString().substring(0,10):null;}
+// ONs con vencimiento conocido
+const ON_VCTO={'DNC6O':'2025-08-05','TLC1O':'2026-07-18','YCA6O':'2025-07-28'};
+function onVencida(tk){const f=ON_VCTO[tk];return f&&new Date(f)<new Date();}
+function onVStr(tk){return ON_VCTO[tk]||null;}
 function fP(n){if(isNaN(n)||n==null)return'—';const s=n<0;return(s?'−':'')+'$'+Math.abs(Math.round(n)).toLocaleString('es-AR');}
 function fU(n){if(isNaN(n)||n==null)return'—';return(n<0?'−':'')+Math.abs(Math.round(n)).toLocaleString('es-AR');}
 function fPct(n){if(isNaN(n)||n==null)return'—';return(n>=0?'+':'')+n.toFixed(2)+'%';}
@@ -486,6 +490,11 @@ function getData(){
 
 // ═══ IMPORT ═══
 function handleBol(e){if(!activeId||!clients[activeId]){g('msg-b').innerHTML='<div class="al al-err">Seleccioná un cliente primero.</div>';return;}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});parseBol(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''}));}catch(err){g('msg-b').innerHTML=`<div class="al al-err">Error: ${err.message}</div>`;}};r.readAsArrayBuffer(f);}
+// Mapa de tickers equivalentes (mismo activo, distinto ticker)
+const TICKER_ALIAS={'KO':'KO.E','KO.E':'KO.E'};
+
+function normTicker(t){return TICKER_ALIAS[t]||t;}
+
 function parseBol(data){
   if(!activeId||!clients[activeId])return;const c=clients[activeId];c.boletos=[];
   const isIOL=data.length>0&&('Operacion' in data[0]||'Operación' in data[0]);
@@ -494,7 +503,7 @@ function parseBol(data){
       const estado=(row['Estado']||'').toString().trim();if(estado!=='Ejecutada')return;
       const opRaw=(row['Operacion']||row['Operación']||'').toString().trim().toUpperCase();
       let tipo='';if(opRaw.includes('COMPRA'))tipo='COMPRA';else if(opRaw.includes('VENTA'))tipo='VENTA';else return;
-      const ticker=(row['Ticker']||'').toString().trim();if(!ticker)return;
+      const ticker=normTicker((row['Ticker']||'').toString().trim());if(!ticker)return;
       const cant=parseFloat((row['Cantidad Operada']||'0').toString().replace(',','.'))||0;
       const precio=parseFloat((row['Precio Operado']||'0').toString().replace(',','.'))||0;
       if(cant<=0||cant===-1)return;
@@ -504,9 +513,11 @@ function parseBol(data){
       if(fechaRaw.includes('/')){const p=fechaRaw.split('/');conc=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}else conc=fechaRaw.substring(0,10);
       c.boletos.push({num:row['id Orden']||'',tipo,ticker,desc:ticker,cant,precio,neto:cant*precio,moneda,conc,liq:conc,ta:getTipo(ticker,'')});
     } else {
-      const tipo=(row['Tipo']||'').toString().trim().toUpperCase();
-      if(['APCOLCON','APCOLCUT','APCOLBAL'].includes(tipo)||tipo.startsWith('APERTURA'))return;
-      const ticker=(row['Ticker']||'').toString().trim();const desc=(row['Descripción']||row['Descripcion']||'').toString().trim();
+      const tipoRaw=(row['Tipo']||'').toString().trim().toUpperCase();
+      if(['APCOLCON','APCOLCUT','APCOLBAL'].includes(tipoRaw)||tipoRaw.startsWith('APERTURA'))return;
+      const tickerRaw=(row['Ticker']||'').toString().trim();
+      const ticker=normTicker(tickerRaw);
+      const desc=(row['Descripción']||row['Descripcion']||'').toString().trim();
       const cant=parseFloat((row['Cant.']||row['Cantidad']||'0').toString().replace(',','.'))||0;
       const precio=parseFloat((row['Precio']||'0').toString().replace(',','.'))||0;
       const neto=parseFloat((row['Neto']||'0').toString().replace(',','.'))||0;
@@ -515,8 +526,12 @@ function parseBol(data){
       const liq=(row['Liquidación']||row['Liquidacion']||'').toString().substring(0,10);
       const num=row['Número']||row['Numero']||'';
       if(!ticker||cant===0)return;
-      const tn=['COMPRAEXT','LICITACIÓN MAE','LICITACION MAE'].includes(tipo)?'COMPRA':tipo;
-      c.boletos.push({num,tipo:tn,ticker,desc:desc||ticker,cant,precio,neto,moneda,conc,liq,ta:getTipo(ticker,desc)});
+      // CSBNG = canje que cierra posición → tratar como VENTA
+      let tipo=tipoRaw;
+      if(['COMPRAEXT','LICITACIÓN MAE','LICITACION MAE'].includes(tipoRaw))tipo='COMPRA';
+      else if(tipoRaw==='CSBNG')tipo='VENTA';
+      else if(tipoRaw!=='COMPRA'&&tipoRaw!=='VENTA')return;
+      c.boletos.push({num,tipo,ticker,desc:desc||ticker,cant,precio,neto,moneda,conc,liq,ta:getTipo(ticker,desc)});
     }
   });
   calcC(c);renderCL();renderAll();renderPG();fetchPx(true);
@@ -587,8 +602,10 @@ function calcC(c){
     p.costoTotalARS=colaC.reduce((s,x)=>{if(x.cr<=0)return s;const pu=x.neto/x.cant;return s+toARS(pu*x.cr,x.moneda,x.conc);},0);
     p.flujosARS=(fByTk[p.ticker]?.ars)||0;
     if(tc2>0){let dp=0;p.compras.forEach(x=>{dp+=(x.cant/tc2)*dds(x.conc,today)});p.diasProm=Math.round(dp);}else p.diasProm=0;
-    if(p.cantTotal>0&&p.tipo==='Letra'&&letraVencida(p.ticker)){
-      const fvStr=letraVStr(p.ticker);const costoARS=p.costoTotalARS;
+    // Vencimiento automático para Letras y ONs vencidas
+    const esVencida=(p.tipo==='Letra'&&letraVencida(p.ticker))||(p.tipo==='ON'&&onVencida(p.ticker));
+    if(p.cantTotal>0&&esVencida){
+      const fvStr=p.tipo==='ON'?onVStr(p.ticker):letraVStr(p.ticker);const costoARS=p.costoTotalARS;
       const amortReal=fByTk[p.ticker]?.items.filter(f=>f.tipo==='Amortización').reduce((s,f)=>s+f.importeARS,0)||0;
       const ingresoARS=amortReal>0?amortReal:toARS(p.cantTotal*1,p.moneda,fvStr||today);
       const ganARS=ingresoARS-costoARS;const ganUSD=ganARS/getTCd(fvStr||today);const rentPct=costoARS>0?(ganARS/costoARS)*100:0;
