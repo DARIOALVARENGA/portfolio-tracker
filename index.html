@@ -1026,29 +1026,7 @@ function renderPos(){
       h+=`</tbody>`;
     });
 
-    // Subtotal grupo
-    const totIni=items.reduce((s,p)=>s+(p.costoTotalARS||0),0);
-    const totAct=items.reduce((s,p)=>{const pr=precios[p.ticker];return s+(pr?calcValorActualARS(pr,p.cantTotal,p.tipo):0);},0);
-    const totFl=items.reduce((s,p)=>s+(p.flujosARS||0),0);
-    const totGan=totAct+totFl-totIni;
-    const totPct=totIni>0?(totGan/totIni)*100:0;
-    const totUSD=totGan/tcHoyVal;
-    const totUSDpct=totIni>0?(totUSD/(totIni/tcHoyVal))*100:0;
-    h+=`<tr style="background:var(--sf);border-top:1px solid var(--bd2)">
-      <td></td><td colspan="${isCon?2:1}" style="font-size:11px;color:var(--t3);font-weight:600">Subtotal ${tipo}</td>
-      ${isCon?'<td></td>':''}
-      <td></td><td></td><td></td>
-      <td class="num" style="text-align:right;font-weight:600">${totAct?fP(totAct):'—'}</td>
-      <td class="num" style="text-align:right;font-weight:600">${fP(totIni)}</td>
-      <td class="num ${cc(totGan)}" style="text-align:right;font-weight:600">${fP(totGan)}</td>
-      <td class="${cc(totPct)}" style="text-align:right;font-weight:600">${fPct(totPct)}</td>
-      <td class="num dim" style="text-align:right">${Math.round(tcHoyVal).toLocaleString('es-AR')}</td>
-      <td class="num dim" style="text-align:right">${totAct?fU(totAct/tcHoyVal):'—'}</td>
-      <td></td>
-      <td class="num dim" style="text-align:right">${fU(totIni/tcHoyVal)}</td>
-      <td class="num ${cc(totUSD)}" style="text-align:right;font-weight:600">${fU(totUSD)}</td>
-      <td class="${cc(totUSDpct)}" style="text-align:right;font-weight:600">${fPct(totUSDpct)}</td>
-    </tr>`;
+
   });
 
   h+='</tbody></table></div>';
