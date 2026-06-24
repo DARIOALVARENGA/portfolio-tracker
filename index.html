@@ -391,7 +391,7 @@ function precioDisplay(pr,tipo){
 function calcValorActualARS(pr,cant,tipo){
   // Calcula valor actual total en ARS
   if(!pr||!cant)return null;
-  if(esBono(tipo))return cant*pr/100;
+  if(esBono(tipo))return cant*pr/10000; // (cant/100)*(pr/100)
   return pr*cant;
 }
 
@@ -894,26 +894,24 @@ function renderPos(){
   const grupos={};
   pos.forEach(p=>{if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
   const tcHoyVal=tcHoy();
-        const ncols=isCon?18:17;
+      const ncols=isCon?16:15;
 
   let h=`<div class="tw"><table><thead><tr>
     <th style="width:24px"></th>
     <th>Símbolo</th>
     ${isCon?'<th>Cliente</th>':''}
-    <th style="text-align:right">F.Compra</th>
     <th style="text-align:right">Nominales</th>
-    <th style="text-align:right">P.Actual</th>
-    <th style="text-align:right">TC Compra</th>
-    <th style="text-align:right">Inv.ARS</th>
-    <th style="text-align:right">Inv.USD</th>
-    <th style="text-align:right">P.Prom.ARS</th>
+    <th style="text-align:right">Días Ten.</th>
+    <th style="text-align:right">P.Actual ARS</th>
     <th style="text-align:right">Cartera ARS</th>
-    <th style="text-align:right">Cartera USD</th>
+    <th style="text-align:right">Inv.ARS</th>
     <th style="text-align:right">Rend.ARS</th>
-    <th style="text-align:right">Rend.%</th>
     <th style="text-align:right">TNA ARS</th>
+    <th style="text-align:right">TC Actual</th>
+    <th style="text-align:right">Cartera USD</th>
+    <th style="text-align:right">TC Prom.Compra</th>
+    <th style="text-align:right">Inv.USD</th>
     <th style="text-align:right">Rend.USD</th>
-    <th style="text-align:right">Rend.USD%</th>
     <th style="text-align:right">TNA USD</th>
   </tr></thead><tbody>`;
 
@@ -1039,18 +1037,17 @@ function renderPos(){
     h+=`<tr style="background:var(--sf);border-top:1px solid var(--bd2)">
       <td></td><td colspan="${isCon?2:1}" style="font-size:11px;color:var(--t3);font-weight:600">Subtotal ${tipo}</td>
       ${isCon?'<td></td>':''}
-      <td></td><td></td><td></td><td></td>
-      <td class="num" style="text-align:right;font-weight:600">${fP(totIni)}</td>
-      <td class="num dim" style="text-align:right">${fU(totIni/tcHoyVal)}</td>
-      <td></td>
+      <td></td><td></td><td></td>
       <td class="num" style="text-align:right;font-weight:600">${totAct?fP(totAct):'—'}</td>
-      <td class="num dim" style="text-align:right">${totAct?fU(totAct/tcHoyVal):'—'}</td>
+      <td class="num" style="text-align:right;font-weight:600">${fP(totIni)}</td>
       <td class="num ${cc(totGan)}" style="text-align:right;font-weight:600">${fP(totGan)}</td>
       <td class="${cc(totPct)}" style="text-align:right;font-weight:600">${fPct(totPct)}</td>
+      <td class="num dim" style="text-align:right">${Math.round(tcHoyVal).toLocaleString('es-AR')}</td>
+      <td class="num dim" style="text-align:right">${totAct?fU(totAct/tcHoyVal):'—'}</td>
       <td></td>
+      <td class="num dim" style="text-align:right">${fU(totIni/tcHoyVal)}</td>
       <td class="num ${cc(totUSD)}" style="text-align:right;font-weight:600">${fU(totUSD)}</td>
       <td class="${cc(totUSDpct)}" style="text-align:right;font-weight:600">${fPct(totUSDpct)}</td>
-      <td></td>
     </tr>`;
   });
 
