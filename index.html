@@ -391,7 +391,7 @@ function precioDisplay(pr,tipo){
 function calcValorActualARS(pr,cant,tipo){
   // Calcula valor actual total en ARS
   if(!pr||!cant)return null;
-  if(esBono(tipo))return cant*pr/10000; // (cant/100)*(pr/100)
+  if(esBono(tipo))return cant*pr/100;
   return pr*cant;
 }
 
