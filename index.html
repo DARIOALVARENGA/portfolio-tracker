@@ -440,7 +440,7 @@ function letraVStr(tk){const d=parseLetra(tk);return d?d.toISOString().substring
 function fP(n){if(isNaN(n)||n==null)return'—';const s=n<0;return(s?'−':'')+'$'+Math.abs(Math.round(n)).toLocaleString('es-AR');}
 function fU(n){if(isNaN(n)||n==null)return'—';return(n<0?'−':'')+'USD '+Math.abs(n).toFixed(2);}
 function fPct(n){if(isNaN(n)||n==null)return'—';return(n>=0?'+':'')+n.toFixed(2)+'%';}
-function fTNA(n){if(isNaN(n)||n==null||!isFinite(n))return'—';return(n>=0?'+':'')+n.toFixed(1)+'% TNA';}
+function fTNA(n){if(isNaN(n)||n==null||!isFinite(n))return'—';return(n>=0?'+':'')+n.toFixed(1)+'%';}
 function dds(a,b){return Math.max(1,Math.round(Math.abs(new Date(b)-new Date(a))/864e5));}
 function cc(n){return n>=0?'pos':'neg';}
 function ini(s){return s.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');}
