@@ -721,7 +721,7 @@ function renderPos(){
         <td><strong>${p.ticker}</strong>${vtag}</td>
         ${isCon?`<td><span class="pill pcl">${cn}</span></td>`:''}
         <td class="num" style="text-align:right;font-weight:600">${p.cantTotal.toLocaleString('es-AR')}</td>
-        <td class="num dim" style="text-align:right">${dias}</td>
+        <td class="num dim" style="text-align:right">${p.diasProm||'—'}</td>
         <td class="num" style="text-align:right">${prDisp!=null?fP(prDisp):'<span class="dim">—</span>'}</td>
         <td class="num" style="text-align:right;font-weight:600">${cartARS!=null?fP(cartARS):'<span class="dim">—</span>'}</td>
         <td class="num" style="text-align:right">${fP(invARS)}</td>
