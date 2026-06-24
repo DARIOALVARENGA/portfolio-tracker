@@ -494,12 +494,17 @@ async function fetchPx(force=false){
   }
 }
 
-function normPrecio(pr,tipo){if(!pr)return pr;return pr;}
-function valorActualARS(pr,cant,moneda,tipo){
+// IOL devuelve precios de bonos/ONs como precio_lamina_VN100 × 100
+// Para obtener precio por lámina: dividir por 100
+// Para obtener valor actual: (nominales / 100) × (precio_IOL / 100) = nominales × precio_IOL / 10000
+function precioDisplay(pr,tipo){
+  if(!pr)return null;
+  if(tipo==='Bono'||tipo==='ON')return pr/100;
+  return pr;
+}
+function valorActualARS(pr,cant,tipo){
   if(!pr||!cant)return null;
-  // Bonos y ONs: IOL devuelve precio × 100, dividir para obtener precio por lámina VN100
-  // Luego valor actual = (nominales / 100) × precio_lamina = nominales × precio_IOL / 10000
-  if(tipo==='Bono'||tipo==='ON')return (cant/100)*(pr/100);
+  if(tipo==='Bono'||tipo==='ON')return cant*pr/10000;
   return pr*cant;
 }
 
@@ -792,7 +797,7 @@ function sa(id,v,cl){const el=g(id);if(el){el.textContent=v;el.className='rsv '+
 
 function renderKPIs({posiciones,opsCerradas,precios,flujos,isCon}){
   let tARS=0,cARS=0,cnt=0;
-  Object.values(posiciones).filter(p=>p.cantTotal>0).forEach(p=>{cnt++;const pr=precios[p.ticker];cARS+=p.costoTotalARS||toARSn(p.costoTotal,p.moneda);    tARS+=pr?valorActualARS(pr,p.cantTotal,p.moneda,p.tipo):(p.costoTotalARS||toARSn(p.costoTotal,p.moneda));});
+  Object.values(posiciones).filter(p=>p.cantTotal>0).forEach(p=>{cnt++;const pr=precios[p.ticker];cARS+=p.costoTotalARS||toARSn(p.costoTotal,p.moneda);    tARS+=pr?valorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||toARSn(p.costoTotal,p.moneda));});
   const gan=tARS-cARS,rp=cARS>0?(gan/cARS)*100:0;
   const rARS=opsCerradas.reduce((s,o)=>s+o.ganARS,0);const rUSD=opsCerradas.reduce((s,o)=>s+o.ganUSD,0);
   const flARS=flujos.reduce((s,f)=>s+f.importeARS,0);
