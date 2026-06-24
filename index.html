@@ -373,8 +373,19 @@ select option{background:var(--bg3)}input[type=file]{display:none}
 <script>
 // ═══ HELPERS DE PRECIO ═══
 function esBono(t){return t==='Bono'||t==='ON';}
-function precioDisplay(pr,tipo){if(!pr)return null;if(esBono(tipo))return pr/100;return pr;}
-function calcValorActualARS(pr,cant,tipo){if(!pr||!cant)return null;if(esBono(tipo))return cant*pr/100;return pr*cant;}
+function esLetra(t){return t==='Letra';}
+function precioDisplay(pr,tipo){
+  if(!pr)return null;
+  if(esBono(tipo))return pr/100;
+  if(esLetra(tipo))return pr/100;
+  return pr;
+}
+function calcValorActualARS(pr,cant,tipo){
+  if(!pr||!cant)return null;
+  if(esBono(tipo))return cant*pr/100;
+  if(esLetra(tipo))return cant*pr/100;
+  return pr*cant;
+}
 function precioCostoARS(p){const tc2=p.compras.reduce((s,x)=>s+x.cant,0);if(!tc2)return 0;return p.compras.reduce((s,x)=>s+toARS(x.neto,x.moneda,x.conc),0)/tc2;}
 
 // ═══ PERSISTENCIA ═══
@@ -438,9 +449,9 @@ function parseLetra(tk){if(!tk||tk[0]!=='S'||tk.length<5)return null;try{const d
 function letraVencida(tk){const v=parseLetra(tk);return v&&v<new Date();}
 function letraVStr(tk){const d=parseLetra(tk);return d?d.toISOString().substring(0,10):null;}
 function fP(n){if(isNaN(n)||n==null)return'—';const s=n<0;return(s?'−':'')+'$'+Math.abs(Math.round(n)).toLocaleString('es-AR');}
-function fU(n){if(isNaN(n)||n==null)return'—';return(n<0?'−':'')+Math.abs(Math.round(n)).toLocaleString('es-AR');}
+function fU(n){if(isNaN(n)||n==null)return'—';return(n<0?'−':'')+'USD '+Math.abs(n).toFixed(2);}
 function fPct(n){if(isNaN(n)||n==null)return'—';return(n>=0?'+':'')+n.toFixed(2)+'%';}
-function fTNA(n){if(isNaN(n)||n==null||!isFinite(n))return'—';return(n>=0?'+':'')+n.toFixed(1)+'%';}
+function fTNA(n){if(isNaN(n)||n==null||!isFinite(n))return'—';return(n>=0?'+':'')+n.toFixed(1)+'% TNA';}
 function dds(a,b){return Math.max(1,Math.round(Math.abs(new Date(b)-new Date(a))/864e5));}
 function cc(n){return n>=0?'pos':'neg';}
 function ini(s){return s.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');}
