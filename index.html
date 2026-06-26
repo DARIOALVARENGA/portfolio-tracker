@@ -490,8 +490,9 @@ function getData(){
 
 // ═══ IMPORT ═══
 function handleBol(e){if(!activeId||!clients[activeId]){g('msg-b').innerHTML='<div class="al al-err">Seleccioná un cliente primero.</div>';return;}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});parseBol(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''}));}catch(err){g('msg-b').innerHTML=`<div class="al al-err">Error: ${err.message}</div>`;}};r.readAsArrayBuffer(f);}
-// Mapa de tickers equivalentes (mismo activo, distinto ticker)
-const TICKER_ALIAS={'KO':'KO.E','KO.E':'KO.E'};
+// Tickers equivalentes con ratio de conversión {ticker_venta: {ticker_compra, ratio}}
+const TICKER_ALIAS={'KO.E':'KO.E'};
+const TICKER_EQUIV={'KO':{base:'KO.E',ratio:5}}; // 5 KO = 1 KO.E
 
 function normTicker(t){return TICKER_ALIAS[t]||t;}
 
@@ -503,10 +504,12 @@ function parseBol(data){
       const estado=(row['Estado']||'').toString().trim();if(estado!=='Ejecutada')return;
       const opRaw=(row['Operacion']||row['Operación']||'').toString().trim().toUpperCase();
       let tipo='';if(opRaw.includes('COMPRA'))tipo='COMPRA';else if(opRaw.includes('VENTA'))tipo='VENTA';else return;
-      const ticker=normTicker((row['Ticker']||'').toString().trim());if(!ticker)return;
-      const cant=parseFloat((row['Cantidad Operada']||'0').toString().replace(',','.'))||0;
+      let ticker=(row['Ticker']||'').toString().trim();if(!ticker)return;
+      let cant=parseFloat((row['Cantidad Operada']||'0').toString().replace(',','.'))||0;
       const precio=parseFloat((row['Precio Operado']||'0').toString().replace(',','.'))||0;
       if(cant<=0||cant===-1)return;
+      // Aplicar equivalencia si existe
+      if(TICKER_EQUIV[ticker]){const eq=TICKER_EQUIV[ticker];cant=cant/eq.ratio;ticker=eq.base;}
       let moneda=(row['Moneda']||'Pesos').toString().trim();
       if(moneda==='Dólares C.V.'||moneda==='Dólares C.V')moneda='Dólares C.V. 7000';else if(moneda==='Dólares'||moneda==='USD')moneda='Dólares';else moneda='Pesos';
       const fechaRaw=(row['Fecha']||'').toString().trim();let conc='';
@@ -515,18 +518,19 @@ function parseBol(data){
     } else {
       const tipoRaw=(row['Tipo']||'').toString().trim().toUpperCase();
       if(['APCOLCON','APCOLCUT','APCOLBAL'].includes(tipoRaw)||tipoRaw.startsWith('APERTURA'))return;
-      const tickerRaw=(row['Ticker']||'').toString().trim();
-      const ticker=normTicker(tickerRaw);
+      let tickerRaw=(row['Ticker']||'').toString().trim();
       const desc=(row['Descripción']||row['Descripcion']||'').toString().trim();
-      const cant=parseFloat((row['Cant.']||row['Cantidad']||'0').toString().replace(',','.'))||0;
+      let cant=parseFloat((row['Cant.']||row['Cantidad']||'0').toString().replace(',','.'))||0;
       const precio=parseFloat((row['Precio']||'0').toString().replace(',','.'))||0;
       const neto=parseFloat((row['Neto']||'0').toString().replace(',','.'))||0;
       const moneda=(row['Moneda']||'Pesos').toString().trim();
       const conc=(row['Concertación']||row['Concertacion']||'').toString().substring(0,10);
       const liq=(row['Liquidación']||row['Liquidacion']||'').toString().substring(0,10);
       const num=row['Número']||row['Numero']||'';
-      if(!ticker||cant===0)return;
-      // CSBNG = canje que cierra posición → tratar como VENTA
+      if(!tickerRaw||cant===0)return;
+      // Aplicar equivalencia si existe
+      let ticker=tickerRaw;
+      if(TICKER_EQUIV[tickerRaw]){const eq=TICKER_EQUIV[tickerRaw];cant=cant/eq.ratio;ticker=eq.base;}
       let tipo=tipoRaw;
       if(['COMPRAEXT','LICITACIÓN MAE','LICITACION MAE'].includes(tipoRaw))tipo='COMPRA';
       else if(tipoRaw==='CSBNG')tipo='VENTA';
