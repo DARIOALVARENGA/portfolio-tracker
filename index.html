@@ -93,6 +93,7 @@ td.pos{color:var(--pos);font-weight:500}td.neg{color:var(--neg);font-weight:500}
 .pc{background:rgba(99,153,34,.18);color:#8fc93a}.po{background:rgba(127,119,221,.18);color:#b0a9f5}
 .pl{background:rgba(29,158,117,.18);color:#3ecfa0}.pbuy{background:rgba(46,204,138,.15);color:var(--pos)}
 .psel{background:rgba(232,97,74,.15);color:var(--neg)}.pv{background:rgba(201,146,42,.15);color:#e8b44a}
+.pf{background:rgba(224,64,251,.15);color:#E040FB}
 .pcl{background:var(--sf2);color:var(--t2);border:1px solid var(--bd)}.pfx{background:rgba(127,119,221,.12);color:#b0a9f5;border:1px solid rgba(127,119,221,.2)}
 .prt{background:rgba(46,204,138,.1);color:#3ecfa0;border:1px solid rgba(46,204,138,.2)}.pdv{background:rgba(55,138,221,.12);color:#7ab8f0;border:1px solid rgba(55,138,221,.2)}
 .dr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -320,7 +321,16 @@ select option{background:var(--bg3)}input[type=file]{display:none}
           </div>
         </div>
         <div class="card">
-          <div class="ch"><span class="ct">TC fallback (sin internet)</span></div>
+          <div class="ch"><span class="ct">3 · Histórico de órdenes</span><span class="pill pf" style="font-size:10px">Fondos</span></div>
+          <div class="cb">
+            <div id="noc3" class="al al-err" style="display:none">Creá o seleccioná un cliente primero.</div>
+            <div class="uz" id="dz-ho" onclick="document.getElementById('fi-ho').click()">
+              <div class="uz-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+              <div class="uz-t">Arrastrá o hacé click</div><div class="uz-s">Histórico_Ordenes.xlsx — desde Balanz</div>
+            </div>
+            <input type="file" id="fi-ho" accept=".xlsx,.xls" onchange="handleHO(event)"><div id="msg-ho"></div>
+          </div>
+        </div>
           <div class="cb">
             <div class="tc-r">
               <div class="tcg"><label>USD MEP</label><input type="number" id="tc-mep" value="1429.69"></div>
@@ -437,14 +447,14 @@ async function fetchPx(force=false){
 // ═══ STATE ═══
 let clients={},activeId=null;
 const TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',AE38:'Bono',AL41:'Bono',AL29:'Bono',GD29:'Bono',GD38:'Bono',GD41:'Bono',GD46:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR',AAPL:'CEDEAR',GE:'CEDEAR',AXP:'CEDEAR',BBD:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON',YMCJO:'ON'};
-const TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Otro':'#5F5E5A'};
+const TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Fondo':'#E040FB','Otro':'#5F5E5A'};
 const ACOLS=['#185FA5','#0F6E56','#534AB7','#854F0B','#A32D2D','#3B6D11','#712B13'];
 const MESC={E:1,F:2,M:3,A:4,Y:5,J:6,L:7,G:8,P:9,O:10,N:11,D:12};
 const CC_T={'Amortización':'Amortización','Renta':'Renta','Renta y Amortización':'Renta','Dividendo en efectivo':'Dividendo','Intereses devengados':'Renta','Prima por rescate':'Renta','Rescate':'Amortización'};
 
 function g(id){return document.getElementById(id);}
 function getTipo(t,d=''){if(TMAP[t])return TMAP[t];const u=(d||'').toUpperCase();if(u.includes('LETRA')||u.includes('LT REP')||parseLetra(t))return'Letra';if(u.includes('CEDEAR'))return'CEDEAR';if(u.includes('BONO'))return'Bono';if(u.includes('REGS')||u.includes('VTO.'))return'ON';return'Acción';}
-function pc(t){return'pill '+({'Acción':'pa','Bono':'pb','CEDEAR':'pc','ON':'po','Letra':'pl'}[t]||'pa');}
+function pc(t){return'pill '+({'Acción':'pa','Bono':'pb','CEDEAR':'pc','ON':'po','Letra':'pl','Fondo':'pf'}[t]||'pa');}
 function parseLetra(tk){if(!tk||tk[0]!=='S'||tk.length<5)return null;try{const d=parseInt(tk.substring(1,3)),mc=tk[3].toUpperCase(),ay=parseInt(tk[4]),m=MESC[mc];if(!m||isNaN(d)||isNaN(ay))return null;return new Date(2020+ay,m-1,d);}catch(e){return null;}}
 function letraVencida(tk){const v=parseLetra(tk);return v&&v<new Date();}
 function letraVStr(tk){const d=parseLetra(tk);return d?d.toISOString().substring(0,10):null;}
@@ -544,6 +554,41 @@ function parseBol(data){
   let m=`<div class="al al-ok">✓ <strong>${c.boletos.length} boletos</strong> · ${pa} posiciones · ${c.opsCerradas.length} ops.</div>`;
   if(lv)m+=`<div class="al al-warn">⚠ ${lv} letra${lv!==1?'s':''} vencida${lv!==1?'s':''} cerrada${lv!==1?'s':''} automáticamente.</div>`;
   g('msg-b').innerHTML=m;scheduleSave();
+}
+
+function handleHO(e){if(!activeId||!clients[activeId]){g('msg-ho').innerHTML='<div class="al al-err">Seleccioná un cliente primero.</div>';return;}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});parseHO(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''}));}catch(err){g('msg-ho').innerHTML=`<div class="al al-err">Error: ${err.message}</div>`;}};r.readAsArrayBuffer(f);}
+
+function parseHO(data){
+  if(!activeId||!clients[activeId])return;
+  const c=clients[activeId];
+  // Eliminar boletos previos de fondos para reimportar
+  c.boletos=c.boletos.filter(b=>b.ta!=='Fondo');
+  let cnt=0;
+  data.forEach(row=>{
+    const estado=(row['Estado']||'').toString().trim();
+    if(estado!=='Ejecutada')return;
+    const opRaw=(row['Operación']||row['Operacion']||'').toString().trim();
+    let tipo='';
+    if(opRaw.includes('Suscripción')||opRaw.includes('Suscripcion')||opRaw.includes('Compra'))tipo='COMPRA';
+    else if(opRaw.includes('Rescate')||opRaw.includes('Venta'))tipo='VENTA';
+    else return;
+    const ticker=(row['Ticker']||'').toString().trim();
+    if(!ticker)return;
+    const cantOp=parseFloat((row['Cantidad Operada']||row['Cantidad']||'0').toString().replace(',','.'))||0;
+    const precioOp=parseFloat((row['Precio Operado']||row['Precio']||'0').toString().replace(',','.'))||0;
+    if(cantOp<=0||cantOp===-1)return;
+    const moneda=(row['Moneda']||'Pesos').toString().trim();
+    const fechaRaw=(row['Fecha']||'').toString().trim();
+    let conc='';
+    if(fechaRaw.includes('/')){const p=fechaRaw.split('/');conc=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
+    else conc=fechaRaw.substring(0,10);
+    const neto=cantOp*precioOp;
+    c.boletos.push({num:row['Orden']||'',tipo,ticker,desc:ticker,cant:cantOp,precio:precioOp,neto,moneda,conc,liq:conc,ta:'Fondo'});
+    cnt++;
+  });
+  calcC(c);renderCL();renderAll();renderPG();
+  g('msg-ho').innerHTML=`<div class="al al-ok">✓ <strong>${cnt} órdenes de fondos</strong> importadas.</div>`;
+  scheduleSave();
 }
 
 function handleCC(e){if(!activeId||!clients[activeId]){g('msg-cc').innerHTML='<div class="al al-err">Seleccioná un cliente primero.</div>';return;}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});parseCC(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''}));}catch(err){g('msg-cc').innerHTML=`<div class="al al-err">Error: ${err.message}</div>`;}};r.readAsArrayBuffer(f);}
@@ -697,7 +742,7 @@ function renderPos(){
   const ft=g('f-tp')?.value||'',fk=(g('f-tk')?.value||'').toUpperCase();
   const pos=Object.values(posiciones).filter(p=>p.cantTotal>0&&(!ft||p.tipo===ft)&&(!fk||p.ticker.includes(fk)));
   if(!pos.length){g('pos-b').innerHTML='<div class="empty"><p>Sin resultados</p></div>';return;}
-  const orden=['Acción','CEDEAR','Bono','ON','Letra','Otro'];
+  const orden=['Acción','CEDEAR','Bono','ON','Letra','Fondo','Otro'];
   const grupos={};pos.forEach(p=>{if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
   const tcHoyVal=tcHoy();
   const NC=isCon?17:16; // número de columnas
@@ -928,7 +973,7 @@ function setupDZ(dzId,handler){
   dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
   dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(!activeId||!clients[activeId])return;const f=e.dataTransfer.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});handler(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:false,defval:''}));}catch(err){console.error(err);}};r.readAsArrayBuffer(f);});
 }
-setupDZ('dz-b',parseBol);setupDZ('dz-cc',parseCC);
+setupDZ('dz-b',parseBol);setupDZ('dz-cc',parseCC);setupDZ('dz-ho',parseHO);
 
 setPill('px','warn','Importá boletos');
 loadFromStorage();
