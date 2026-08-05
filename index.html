@@ -1302,27 +1302,12 @@ function exportPDF(){
     return h;
   }
 
-  function htmlBoletos(){
-    var h=pageHeader('Boletos');
-    var bols=(d.boletos||[]).slice().sort(function(a,b){return (b.conc||'').localeCompare(a.conc||'');});
-    if(!bols.length){h+='<div style="color:#666260;padding:10px 0">Sin boletos importados.</div>';return h;}
-    h+='<table style="width:100%;border-collapse:collapse;font-size:10.5px"><thead><tr style="background:#1a2d45"><th style="padding:4px 6px;text-align:left;color:#666260">N°</th><th style="padding:4px 6px;text-align:left;color:#666260">Tipo</th><th style="padding:4px 6px;text-align:left;color:#666260">Ticker</th><th style="padding:4px 6px;text-align:right;color:#666260">Fecha</th><th style="padding:4px 6px;text-align:right;color:#666260">Cant.</th><th style="padding:4px 6px;text-align:right;color:#666260">Precio</th><th style="padding:4px 6px;text-align:right;color:#666260">Neto</th><th style="padding:4px 6px;text-align:left;color:#666260">Moneda</th><th style="padding:4px 6px;text-align:right;color:#666260">Monto ARS</th></tr></thead><tbody>';
-    bols.forEach(function(b,i){
-      var tc=getTCd(b.conc);var esUSD=isUSD(b.moneda)&&b.moneda!=='Dólares C.V. 7000';
-      var montoARS=esUSD?b.neto*tc:b.neto;
-      var rc=b.tipo==='VENTA'?'#e8b44a':'#7ab8f0';
-      var bg=i%2===0?'#142035':'#0f1d30';
-      h+='<tr style="background:'+bg+'"><td style="padding:4px 6px;color:#666260">'+(b.num||'—')+'</td><td style="padding:4px 6px;font-weight:600;color:'+rc+'">'+b.tipo+'</td><td style="padding:4px 6px;font-weight:700">'+b.ticker+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace;color:#666260">'+b.conc+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace">'+(b.cant||0).toLocaleString('es-AR')+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace">'+fP(b.precio)+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace">'+fP(b.neto)+'</td><td style="padding:4px 6px;color:#666260;font-size:9.5px">'+b.moneda+'</td><td style="padding:4px 6px;text-align:right;font-family:monospace;font-weight:500">'+fP(montoARS)+'</td></tr>';
-    });
-    h+='</tbody></table>';
-    return h;
-  }
-
   function htmlFlujos(){
     var h=pageHeader('Flujos cobrados');
-    if(!d.flujos.length){h+='<div style="color:#666260;padding:10px 0">Sin flujos de cuenta corriente importados.</div>';return h;}
-    var totFl=d.flujos.reduce(function(s,f){return s+f.importeARS;},0);
-    var porTipo={};d.flujos.forEach(function(f){porTipo[f.tipo]=(porTipo[f.tipo]||0)+f.importeARS;});
+    var flujosR=d.flujos.filter(function(f){return f.tipo!=='Amortización';});
+    if(!flujosR.length){h+='<div style="color:#666260;padding:10px 0">Sin flujos de cuenta corriente importados.</div>';return h;}
+    var totFl=flujosR.reduce(function(s,f){return s+f.importeARS;},0);
+    var porTipo={};flujosR.forEach(function(f){porTipo[f.tipo]=(porTipo[f.tipo]||0)+f.importeARS;});
     var tiposK=Object.keys(porTipo);
     h+='<div style="display:grid;grid-template-columns:repeat('+(tiposK.length+1)+',1fr);gap:1px;background:rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:20px">';
     h+='<div style="background:#142035;padding:10px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Total cobrado</div><div style="font-size:14px;font-weight:600;color:#2ecc8a">'+fP(totFl)+'</div></div>';
@@ -1331,7 +1316,7 @@ function exportPDF(){
     });
     h+='</div>';
     h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a2d45"><th style="padding:5px 8px;text-align:left;color:#666260">Fecha</th><th style="padding:5px 8px;text-align:left;color:#666260">Ticker</th><th style="padding:5px 8px;text-align:left;color:#666260">Tipo</th><th style="padding:5px 8px;text-align:right;color:#666260">Importe</th><th style="padding:5px 8px;text-align:left;color:#666260">Moneda</th><th style="padding:5px 8px;text-align:right;color:#666260">ARS</th></tr></thead><tbody>';
-    d.flujos.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f,i){
+    flujosR.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f,i){
       var bg=i%2===0?'#142035':'#0f1d30';
       h+='<tr style="background:'+bg+'"><td style="padding:5px 8px;font-family:monospace;color:#666260">'+f.fecha+'</td><td style="padding:5px 8px;font-weight:700">'+f.ticker+'</td><td style="padding:5px 8px;color:#a8a49c">'+f.tipo+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+(f.moneda!=='Pesos'?fU(f.importe):fP(f.importe))+'</td><td style="padding:5px 8px;color:#666260;font-size:10px">'+f.moneda+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:500;color:#2ecc8a">'+fP(f.importeARS)+'</td></tr>';
     });
@@ -1339,7 +1324,7 @@ function exportPDF(){
     return h;
   }
 
-  var secciones=[htmlDashboard,htmlPosiciones,htmlOpsCerradas,htmlBoletos,htmlFlujos];
+  var secciones=[htmlDashboard,htmlPosiciones,htmlOpsCerradas,htmlFlujos];
   var total=secciones.length;
   var pdf=null,idx=0;
 
@@ -1371,7 +1356,7 @@ function exportPDF(){
       renderPagina();
     }).catch(function(err){
       document.body.removeChild(wrap);
-      alert('Error generando página '+n+' ('+(idx===0?'Dashboard':idx===1?'Posiciones':idx===2?'Op. cerradas':idx===3?'Boletos':'Flujos')+'): '+err.message);
+      alert('Error generando página '+n+' ('+(idx===0?'Dashboard':idx===1?'Posiciones':idx===2?'Op. cerradas':'Flujos')+'): '+err.message);
     });
   }
   renderPagina();
