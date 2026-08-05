@@ -1160,7 +1160,7 @@ function renderFlujos(){
   var d=getData();
   var ft=g('f-ftk')?g('f-ftk').value:'';
   var ftype=g('f-ftp')?g('f-ftp').value:'';
-  var fl=d.flujos.filter(function(f){return (!ft||f.ticker===ft)&&(!ftype||f.tipo===ftype);});
+  var fl=d.flujos.filter(function(f){return (!ft||f.ticker===ft)&&(ftype?f.tipo===ftype:f.tipo!=='Amortización');});
   var tARS=fl.reduce(function(s,f){return s+f.importeARS;},0);
   var tUSD=fl.filter(function(f){return f.moneda!=='Pesos';}).reduce(function(s,f){return s+f.importe;},0);
   sa('fl-ars',fP(tARS),'pos');sa('fl-usd',fU(tUSD),'pos');g('fl-cnt').textContent=fl.length;
