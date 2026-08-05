@@ -1284,7 +1284,8 @@ function exportPDF(){
   html+='<div style="margin-top:24px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#666260;display:flex;justify-content:space-between"><span>Generado por Portfolio Tracker · Balanz Capital</span><span>'+fecha+'</span></div>';
   wrap.innerHTML=html;
   document.body.appendChild(wrap);
-  html2canvas(wrap,{scale:2,backgroundColor:'#0B1628',useCORS:true,logging:false}).then(function(canvas){
+  var fullH=wrap.scrollHeight,fullW=wrap.scrollWidth;
+  html2canvas(wrap,{scale:2,backgroundColor:'#0B1628',useCORS:true,logging:false,width:fullW,height:fullH,windowWidth:fullW,windowHeight:fullH}).then(function(canvas){
     var imgData=canvas.toDataURL('image/png');
     var jsPDFLib=window.jspdf?window.jspdf.jsPDF:null;
     if(!jsPDFLib){alert('jsPDF no cargado');document.body.removeChild(wrap);return;}
