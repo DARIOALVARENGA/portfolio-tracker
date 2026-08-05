@@ -962,11 +962,12 @@ function renderKPIs(d){
   var gan=tARS-cARS,rp=cARS>0?(gan/cARS)*100:0;
   var rARS=opsCerradas.reduce(function(s,o){return s+o.ganARS;},0);
   var rUSD=opsCerradas.reduce(function(s,o){return s+o.ganUSD;},0);
-  var flARS=flujos.reduce(function(s,f){return s+f.importeARS;},0);
+  var flujosR=flujos.filter(function(f){return f.tipo!=='Amortización';});
+  var flARS=flujosR.reduce(function(s,f){return s+f.importeARS;},0);
   sv('k-tot',fP(tARS));sv('k-cos',fP(cARS));sv('k-gan',fP(gan),cc(gan));
   g('k-ganp').textContent=fPct(rp);sv('k-pos',cnt);g('k-ops').textContent='';
   sv('k-real',fP(rARS),cc(rARS));g('k-rusd').textContent=fU(rUSD);
-  sv('k-fl',fP(flARS),'pos');g('k-fls').textContent=flujos.length+' cobros';
+  sv('k-fl',fP(flARS),'pos');g('k-fls').textContent=flujosR.length+' cobros';
   sa('rs-ars',fP(rARS),cc(rARS));sa('rs-usd',fU(rUSD),cc(rUSD));
   var flTot=opsCerradas.reduce(function(s,o){return s+(o.flujosARS||0);},0);
   sa('rs-fl',fP(flTot));g('rs-ops').textContent=opsCerradas.length;
