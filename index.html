@@ -1323,50 +1323,142 @@ function exportPDF(){
   var gan=tARS-cARS,rp=cARS>0?(gan/cARS)*100:0;
   var rARS=d.opsCerradas.reduce(function(s,o){return s+o.ganARS;},0);
   var orden=['Acción','CEDEAR','Bono','ON','Letra','Fondo','Otro'];
-  var colores={'Acción':'#7ab8f0','Bono':'#e8b44a','CEDEAR':'#8fc93a','ON':'#b0a9f5','Letra':'#3ecfa0','Fondo':'#E040FB','Otro':'#888'};
+
+  // Paleta ejecutiva: fondo blanco, navy institucional, acento dorado sutil, color sólo en +/-
+  var NAVY='#0B2545',NAVY2='#173963',GOLD='#a5762f',MUTED='#6b7785',BORDER='#e3e7eb',ROWALT='#f6f8fa',GREEN='#1a7d4a',RED='#b23a2e',TEXT='#1c2b3a';
+  var donutColores=['#0B2545','#3d6ea5','#8fadc9','#c9922a','#7a8fa3','#b7c4cf'];
 
   function pageHeader(titulo){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.1)">'
-      +'<div><div style="font-size:20px;font-weight:700">DA Financial & Business Advisor</div><div style="font-size:11px;color:#c9922a;letter-spacing:.08em">PORTFOLIO TRACKER · '+titulo.toUpperCase()+'</div></div>'
-      +'<div style="text-align:right"><div style="font-size:14px;font-weight:600">'+label+'</div><div style="font-size:11px;color:#a8a49c">Reporte al '+fecha+' · TC $'+Math.round(tcHoyVal).toLocaleString('es-AR')+'</div></div></div>';
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:14px;margin-bottom:24px;border-bottom:3px solid '+NAVY+'">'
+      +'<div><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;color:'+MUTED+';text-transform:uppercase;margin-bottom:5px">Reporte de cartera</div><div style="font-size:23px;font-weight:800;color:'+NAVY+';letter-spacing:.01em">'+titulo.toUpperCase()+'</div></div>'
+      +'<div style="text-align:right"><div style="font-size:17px;font-weight:800;color:'+NAVY+'">DA FINANCIAL &amp; BUSINESS ADVISOR</div><div style="font-size:10.5px;color:'+MUTED+';margin-top:3px">Portfolio Tracker · '+label+' · '+fecha+' · TC $'+Math.round(tcHoyVal).toLocaleString('es-AR')+'</div></div>'
+      +'</div>';
   }
   function pageFooter(n,total){
-    return '<div style="margin-top:24px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#666260;display:flex;justify-content:space-between"><span>Generado por DA Financial & Business Advisor · Portfolio Tracker</span><span>Página '+n+' de '+total+' · '+fecha+'</span></div>';
+    return '<div style="margin-top:26px;padding-top:10px;border-top:1px solid '+BORDER+';font-size:9.5px;color:'+MUTED+';display:flex;justify-content:space-between"><span>Generado por DA Financial &amp; Business Advisor · Portfolio Tracker</span><span>Página '+n+' de '+total+' · '+fecha+'</span></div>';
   }
+  function sTitle(txt){
+    return '<div style="font-size:12px;font-weight:800;color:'+NAVY+';text-transform:uppercase;letter-spacing:.06em;margin:22px 0 12px;padding-bottom:7px;border-bottom:1.5px solid '+BORDER+'">'+txt+'</div>';
+  }
+  function kpiCard(lbl,val,colorVal){
+    return '<div style="background:'+ROWALT+';border:1px solid '+BORDER+';border-radius:6px;padding:12px 14px"><div style="font-size:9px;color:'+MUTED+';text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+lbl+'</div><div style="font-size:16px;font-weight:800;color:'+(colorVal||NAVY)+'">'+val+'</div></div>';
+  }
+  function thd(txt,align){return '<th style="padding:6px 8px;text-align:'+(align||'left')+';color:'+MUTED+';font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1.5px solid '+NAVY+'">'+txt+'</th>';}
+  function tdd(txt,align,extra){return '<td style="padding:6px 8px;text-align:'+(align||'left')+';border-bottom:1px solid '+BORDER+(extra?';'+extra:'')+'">'+txt+'</td>';}
+
+  function donutChart(segments,size){
+    var total=segments.reduce(function(s,x){return s+x.value;},0);
+    var r=size/2-13,cx=size/2,cy=size/2,circ=2*Math.PI*r;
+    var offset=0;
+    var svg='<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">';
+    svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+BORDER+'" stroke-width="20"/>';
+    segments.forEach(function(s){
+      var frac=total>0?s.value/total:0,len=frac*circ;
+      if(len>0){
+        svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.color+'" stroke-width="20" stroke-dasharray="'+len+' '+(circ-len)+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+      }
+      offset+=len;
+    });
+    svg+='</svg>';
+    return '<div style="position:relative;width:'+size+'px;height:'+size+'px;flex-shrink:0">'+svg
+      +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">'
+      +'<div style="font-size:8.5px;color:'+MUTED+';text-transform:uppercase;letter-spacing:.04em">Cartera</div>'
+      +'<div style="font-size:13px;font-weight:800;color:'+NAVY+'">'+fP(total)+'</div></div></div>';
+  }
+  function barEvo(lbl,val,maxAbs,color){
+    var pct=maxAbs>0?Math.min(100,Math.abs(val)/maxAbs*100):0;
+    return '<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:4px"><span style="font-weight:700;color:'+NAVY+'">'+lbl+'</span><span style="font-weight:800;color:'+color+'">'+fP(val)+'</span></div><div style="background:'+ROWALT+';border:1px solid '+BORDER+';border-radius:3px;height:11px;overflow:hidden"><div style="background:'+color+';height:100%;width:'+pct+'%"></div></div></div>';
+  }
+  function barRend(ticker,pct,maxAbs){
+    var w=maxAbs>0?Math.min(50,Math.abs(pct)/maxAbs*50):0;
+    var color=pct>=0?GREEN:RED;
+    var side=pct>=0?'left':'right';
+    return '<div style="display:flex;align-items:center;margin-bottom:8px;font-size:10.5px">'
+      +'<div style="width:64px;font-weight:700;color:'+NAVY+'">'+ticker+'</div>'
+      +'<div style="flex:1;position:relative;height:13px;background:'+ROWALT+';border:1px solid '+BORDER+';border-radius:2px">'
+      +'<div style="position:absolute;left:50%;top:-1px;width:1px;height:15px;background:'+BORDER2()+'"></div>'
+      +'<div style="position:absolute;'+side+':50%;top:1px;height:11px;width:'+w+'%;background:'+color+';border-radius:1px"></div>'
+      +'</div>'
+      +'<div style="width:58px;text-align:right;font-weight:700;color:'+color+'">'+fPct(pct)+'</div>'
+      +'</div>';
+  }
+  function BORDER2(){return '#c7cdd3';}
 
   function htmlDashboard(){
     var h=pageHeader('Dashboard');
-    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:24px">';
-    h+='<div style="background:#142035;padding:12px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Cartera total</div><div style="font-size:15px;font-weight:600">'+fP(tARS)+'</div></div>';
-    h+='<div style="background:#142035;padding:12px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Costo invertido</div><div style="font-size:15px;font-weight:600">'+fP(cARS)+'</div></div>';
-    h+='<div style="background:#142035;padding:12px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Result. no realizado</div><div style="font-size:15px;font-weight:600;color:'+(gan>=0?'#2ecc8a':'#e8614a')+'">'+fP(gan)+' ('+fPct(rp)+')</div></div>';
-    h+='<div style="background:#142035;padding:12px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Result. realizado</div><div style="font-size:15px;font-weight:600;color:'+(rARS>=0?'#2ecc8a':'#e8614a')+'">'+fP(rARS)+'</div></div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px">';
+    h+=kpiCard('Cartera total',fP(tARS));
+    h+=kpiCard('Costo invertido',fP(cARS));
+    h+=kpiCard('Result. no realizado',fP(gan)+' ('+fPct(rp)+')',gan>=0?GREEN:RED);
+    h+=kpiCard('Result. realizado',fP(rARS),rARS>=0?GREEN:RED);
     h+='</div>';
-    h+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#c9922a;text-transform:uppercase;letter-spacing:.06em">Composición de cartera</div>';
+
     var grupos={};pos.forEach(function(p){if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
-    if(!pos.length){h+='<div style="color:#666260;padding:10px 0">Sin posiciones abiertas.</div>';return h;}
-    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a2d45"><th style="padding:5px 8px;text-align:left;color:#666260">Tipo</th><th style="padding:5px 8px;text-align:right;color:#666260">Posiciones</th><th style="padding:5px 8px;text-align:right;color:#666260">Cartera ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">% Cartera</th></tr></thead><tbody>';
+    if(!pos.length){h+=sTitle('Composición de cartera');h+='<div style="color:'+MUTED+';padding:10px 0">Sin posiciones abiertas.</div>';return h;}
+
+    var segs=[];
     orden.filter(function(t){return grupos[t];}).forEach(function(tipo,i){
-      var items=grupos[tipo];
-      var sub=0;
+      var items=grupos[tipo],sub=0;
       items.forEach(function(p){var pr=d.precios[p.ticker];sub+=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);});
-      var pct=tARS>0?(sub/tARS)*100:0;
-      var bg=i%2===0?'#142035':'#0f1d30';
-      h+='<tr style="background:'+bg+'"><td style="padding:5px 8px;font-weight:700;color:'+(colores[tipo]||'#888')+'">'+tipo+'</td><td style="padding:5px 8px;text-align:right">'+items.length+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+fP(sub)+'</td><td style="padding:5px 8px;text-align:right">'+pct.toFixed(1)+'%</td></tr>';
+      segs.push({tipo:tipo,value:sub,n:items.length,color:donutColores[i%donutColores.length]});
     });
-    h+='</tbody></table>';
+
+    h+=sTitle('Composición de cartera');
+    h+='<div style="display:flex;align-items:center;gap:28px;margin-bottom:6px">';
+    h+=donutChart(segs,150);
+    h+='<div style="flex:1">';
+    segs.forEach(function(s){
+      var pct=tARS>0?(s.value/tARS)*100:0;
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid '+BORDER+'">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;background:'+s.color+';border-radius:2px;display:inline-block"></span><span style="font-weight:700;color:'+NAVY+';font-size:11px">'+s.tipo+'</span><span style="color:'+MUTED+';font-size:10px">· '+s.n+' pos.</span></div>'
+        +'<div style="text-align:right"><span style="font-weight:700;font-size:11px">'+fP(s.value)+'</span><span style="color:'+MUTED+';font-size:10px;margin-left:8px">'+pct.toFixed(1)+'%</span></div>'
+        +'</div>';
+    });
+    h+='</div></div>';
+
+    // Evolución de la inversión (capital pico / ganancia / valor final)
+    var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
+    var ventas=(d.boletos||[]).filter(function(b){return b.tipo==='VENTA';});
+    if(compras.length){
+      var evARS=calcCapitalPico(compras,ventas,d.flujos||[],toARS);
+      var puestoARS=evARS.pico,gananciaARS=evARS.cumFinal+tARS,finalARS=puestoARS+gananciaARS;
+      var maxAbs=Math.max(puestoARS,Math.abs(gananciaARS),finalARS,1);
+      h+=sTitle('Evolución de la inversión (ARS)');
+      h+=barEvo('Capital pico invertido',puestoARS,maxAbs,NAVY2);
+      h+=barEvo('Ganancia total',gananciaARS,maxAbs,gananciaARS>=0?GREEN:RED);
+      h+=barEvo('Valor final equivalente',finalARS,maxAbs,NAVY);
+    }
     return h;
   }
 
   function htmlPosiciones(){
     var h=pageHeader('Posiciones abiertas');
     var grupos={};pos.forEach(function(p){if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
-    if(!pos.length){h+='<div style="color:#666260;padding:10px 0">Sin posiciones abiertas.</div>';return h;}
+    if(!pos.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin posiciones abiertas.</div>';return h;}
+
+    // Gráfico de rendimiento % por posición
+    var conRend=[];
+    pos.forEach(function(p){
+      var pr=d.precios[p.ticker];
+      if(!pr)return;
+      var cA=calcValorActualARS(pr,p.cantTotal,p.tipo);
+      var invARS=p.costoTotalARS||0,fl=p.flujosARS||0;
+      var rendPct=invARS>0?((cA+fl-invARS)/invARS)*100:null;
+      if(rendPct!=null)conRend.push({ticker:p.ticker,pct:rendPct});
+    });
+    if(conRend.length){
+      conRend.sort(function(a,b){return b.pct-a.pct;});
+      var maxAbs=conRend.reduce(function(m,x){return Math.max(m,Math.abs(x.pct));},1);
+      h+=sTitle('Rendimiento % por posición');
+      conRend.forEach(function(x){h+=barRend(x.ticker,x.pct,maxAbs);});
+    }
+
+    h+=sTitle('Detalle de posiciones');
     orden.filter(function(t){return grupos[t];}).forEach(function(tipo){
       var items=grupos[tipo].sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);});
-      h+='<div style="margin-bottom:16px"><div style="background:#1d2f4a;padding:5px 10px;font-size:10px;font-weight:600;text-transform:uppercase;color:'+(colores[tipo]||'#888')+';border-radius:4px 4px 0 0">'+tipo+' · '+items.length+' posición'+(items.length!==1?'es':'')+'</div>';
-      h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a2d45"><th style="padding:5px 8px;text-align:left;color:#666260">Símbolo</th><th style="padding:5px 8px;text-align:right;color:#666260">Nominales</th><th style="padding:5px 8px;text-align:right;color:#666260">P.Actual</th><th style="padding:5px 8px;text-align:right;color:#666260">Cartera ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Inv.ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Rend.ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Rend.%</th><th style="padding:5px 8px;text-align:right;color:#666260">Cartera USD</th><th style="padding:5px 8px;text-align:right;color:#666260">Inv.USD</th></tr></thead><tbody>';
-      items.forEach(function(p,i){
+      h+='<div style="margin:14px 0 6px;font-size:10.5px;font-weight:800;color:'+NAVY+';text-transform:uppercase;letter-spacing:.04em">'+tipo+' · '+items.length+' posición'+(items.length!==1?'es':'')+'</div>';
+      h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Símbolo')+thd('Nominales','right')+thd('P.Actual','right')+thd('Cartera ARS','right')+thd('Inv.ARS','right')+thd('Rend.ARS','right')+thd('Rend.%','right')+thd('Cartera USD','right')+thd('Inv.USD','right')+'</tr></thead><tbody>';
+      items.forEach(function(p){
         var pr=d.precios[p.ticker];
         var prD=pr?precioDisplay(pr,p.tipo):null;
         var cA=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):null;
@@ -1375,22 +1467,21 @@ function exportPDF(){
         var rendPct=invARS>0&&rendARS!=null?(rendARS/invARS)*100:null;
         var cartUSD=cA!=null?cA/tcHoyVal:null;
         var invUSD=invARS/tcHoyVal;
-        var rc=rendARS!=null?(rendARS>=0?'#2ecc8a':'#e8614a'):'#666260';
-        var bg=i%2===0?'#142035':'#0f1d30';
-        h+='<tr style="background:'+bg+'"><td style="padding:5px 8px;font-weight:700">'+p.ticker+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+p.cantTotal.toLocaleString('es-AR')+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+(prD!=null?fP(prD):'—')+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:600">'+(cA!=null?fP(cA):'—')+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+fP(invARS)+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:600;color:'+rc+'">'+(rendARS!=null?fP(rendARS):'—')+'</td><td style="padding:5px 8px;text-align:right;font-weight:600;color:'+rc+'">'+(rendPct!=null?fPct(rendPct):'—')+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;color:#a8a49c">'+(cartUSD!=null?fU(cartUSD):'—')+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;color:#a8a49c">'+fU(invUSD)+'</td></tr>';
+        var rc=rendARS!=null?(rendARS>=0?GREEN:RED):MUTED;
+        h+='<tr>'+tdd('<b>'+p.ticker+'</b>')+tdd(p.cantTotal.toLocaleString('es-AR'),'right','font-family:monospace')+tdd(prD!=null?fP(prD):'—','right','font-family:monospace')+tdd(cA!=null?fP(cA):'—','right','font-family:monospace;font-weight:700')+tdd(fP(invARS),'right','font-family:monospace')+tdd(rendARS!=null?fP(rendARS):'—','right','font-family:monospace;font-weight:700;color:'+rc)+tdd(rendPct!=null?fPct(rendPct):'—','right','font-weight:700;color:'+rc)+tdd(cartUSD!=null?fU(cartUSD):'—','right','font-family:monospace;color:'+MUTED)+tdd(fU(invUSD),'right','font-family:monospace;color:'+MUTED)+'</tr>';
       });
-      h+='</tbody></table></div>';
+      h+='</tbody></table>';
     });
     return h;
   }
 
   function htmlOpsCerradas(){
     var h=pageHeader('Operaciones cerradas');
-    if(!d.opsCerradas.length){h+='<div style="color:#666260;padding:10px 0">Sin operaciones cerradas.</div>';return h;}
-    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a2d45"><th style="padding:5px 8px;text-align:left;color:#666260">Ticker</th><th style="padding:5px 8px;text-align:left;color:#666260">Tipo</th><th style="padding:5px 8px;text-align:right;color:#666260">F.Compra</th><th style="padding:5px 8px;text-align:right;color:#666260">F.Cierre</th><th style="padding:5px 8px;text-align:right;color:#666260">Días</th><th style="padding:5px 8px;text-align:right;color:#666260">Costo ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Ingreso ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Res.ARS</th><th style="padding:5px 8px;text-align:right;color:#666260">Rent.%</th><th style="padding:5px 8px;text-align:right;color:#666260">TNA</th></tr></thead><tbody>';
-    d.opsCerradas.slice().sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o,i){
-      var rc=o.ganARS>=0?'#2ecc8a':'#e8614a';var bg=i%2===0?'#142035':'#0f1d30';
-      h+='<tr style="background:'+bg+'"><td style="padding:5px 8px;font-weight:700">'+o.ticker+'</td><td style="padding:5px 8px;color:#a8a49c">'+o.tipo+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;color:#666260">'+o.fechaCompra+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;color:#666260">'+o.fechaVenta+'</td><td style="padding:5px 8px;text-align:right;color:#666260">'+o.diasTen+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+fP(o.costoARS)+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+fP(o.ingresoARS)+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:600;color:'+rc+'">'+fP(o.ganARS)+'</td><td style="padding:5px 8px;text-align:right;font-weight:600;color:'+rc+'">'+fPct(o.rentPct)+'</td><td style="padding:5px 8px;text-align:right;color:'+rc+'">'+fTNA(o.tna)+'</td></tr>';
+    if(!d.opsCerradas.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin operaciones cerradas.</div>';return h;}
+    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('F.Compra','right')+thd('F.Cierre','right')+thd('Días','right')+thd('Costo ARS','right')+thd('Ingreso ARS','right')+thd('Res.ARS','right')+thd('Rent.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
+    d.opsCerradas.slice().sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
+      var rc=o.ganARS>=0?GREEN:RED;
+      h+='<tr>'+tdd('<b>'+o.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+o.tipo+'</span>')+tdd(o.fechaCompra,'right','font-family:monospace;color:'+MUTED)+tdd(o.fechaVenta,'right','font-family:monospace;color:'+MUTED)+tdd(o.diasTen,'right','color:'+MUTED)+tdd(fP(o.costoARS),'right','font-family:monospace')+tdd(fP(o.ingresoARS),'right','font-family:monospace')+tdd(fP(o.ganARS),'right','font-family:monospace;font-weight:700;color:'+rc)+tdd(fPct(o.rentPct),'right','font-weight:700;color:'+rc)+tdd(fTNA(o.tna),'right','color:'+rc)+'</tr>';
     });
     h+='</tbody></table>';
     return h;
@@ -1399,20 +1490,18 @@ function exportPDF(){
   function htmlFlujos(){
     var h=pageHeader('Flujos cobrados');
     var flujosR=d.flujos.filter(function(f){return f.tipo!=='Amortización';});
-    if(!flujosR.length){h+='<div style="color:#666260;padding:10px 0">Sin flujos de cuenta corriente importados.</div>';return h;}
+    if(!flujosR.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin flujos de cuenta corriente importados.</div>';return h;}
     var totFl=flujosR.reduce(function(s,f){return s+f.importeARS;},0);
     var porTipo={};flujosR.forEach(function(f){porTipo[f.tipo]=(porTipo[f.tipo]||0)+f.importeARS;});
     var tiposK=Object.keys(porTipo);
-    h+='<div style="display:grid;grid-template-columns:repeat('+(tiposK.length+1)+',1fr);gap:1px;background:rgba(255,255,255,.07);border-radius:10px;overflow:hidden;margin-bottom:20px">';
-    h+='<div style="background:#142035;padding:10px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">Total cobrado</div><div style="font-size:14px;font-weight:600;color:#2ecc8a">'+fP(totFl)+'</div></div>';
-    tiposK.forEach(function(t){
-      h+='<div style="background:#142035;padding:10px 14px"><div style="font-size:9px;color:#666260;text-transform:uppercase;margin-bottom:4px">'+t+'</div><div style="font-size:14px;font-weight:600">'+fP(porTipo[t])+'</div></div>';
-    });
+    h+='<div style="display:grid;grid-template-columns:repeat('+(tiposK.length+1)+',1fr);gap:10px;margin-bottom:8px">';
+    h+=kpiCard('Total cobrado',fP(totFl),GREEN);
+    tiposK.forEach(function(t){h+=kpiCard(t,fP(porTipo[t]));});
     h+='</div>';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a2d45"><th style="padding:5px 8px;text-align:left;color:#666260">Fecha</th><th style="padding:5px 8px;text-align:left;color:#666260">Ticker</th><th style="padding:5px 8px;text-align:left;color:#666260">Tipo</th><th style="padding:5px 8px;text-align:right;color:#666260">Importe</th><th style="padding:5px 8px;text-align:left;color:#666260">Moneda</th><th style="padding:5px 8px;text-align:right;color:#666260">ARS</th></tr></thead><tbody>';
-    flujosR.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f,i){
-      var bg=i%2===0?'#142035':'#0f1d30';
-      h+='<tr style="background:'+bg+'"><td style="padding:5px 8px;font-family:monospace;color:#666260">'+f.fecha+'</td><td style="padding:5px 8px;font-weight:700">'+f.ticker+'</td><td style="padding:5px 8px;color:#a8a49c">'+f.tipo+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace">'+(f.moneda!=='Pesos'?fU(f.importe):fP(f.importe))+'</td><td style="padding:5px 8px;color:#666260;font-size:10px">'+f.moneda+'</td><td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:500;color:#2ecc8a">'+fP(f.importeARS)+'</td></tr>';
+    h+=sTitle('Detalle de cobros');
+    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Fecha')+thd('Ticker')+thd('Tipo')+thd('Importe','right')+thd('Moneda')+thd('ARS','right')+'</tr></thead><tbody>';
+    flujosR.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f){
+      h+='<tr>'+tdd(f.fecha,'left','font-family:monospace;color:'+MUTED)+tdd('<b>'+f.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+f.tipo+'</span>')+tdd(f.moneda!=='Pesos'?fU(f.importe):fP(f.importe),'right','font-family:monospace')+tdd('<span style="color:'+MUTED+';font-size:10px">'+f.moneda+'</span>')+tdd(fP(f.importeARS),'right','font-family:monospace;font-weight:700;color:'+GREEN)+'</tr>';
     });
     h+='</tbody></table>';
     return h;
@@ -1430,11 +1519,11 @@ function exportPDF(){
     var n=idx+1;
     var bodyHtml=secciones[idx]()+pageFooter(n,total);
     var wrap=document.createElement('div');
-    wrap.style.cssText='position:absolute;left:-9999px;top:0;width:1100px;background:#0B1628;color:#f0ece4;font-family:sans-serif;font-size:12px;padding:30px;';
+    wrap.style.cssText='position:absolute;left:-9999px;top:0;width:1100px;background:#ffffff;color:'+TEXT+';font-family:sans-serif;font-size:12px;padding:34px;';
     wrap.innerHTML=bodyHtml;
     document.body.appendChild(wrap);
     var fullH=wrap.scrollHeight,fullW=wrap.scrollWidth;
-    html2canvas(wrap,{scale:2,backgroundColor:'#0B1628',useCORS:true,logging:false,width:fullW,height:fullH,windowWidth:fullW,windowHeight:fullH}).then(function(canvas){
+    html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,width:fullW,height:fullH,windowWidth:fullW,windowHeight:fullH}).then(function(canvas){
       document.body.removeChild(wrap);
       var imgData=canvas.toDataURL('image/png');
       var pw=canvas.width/2,ph=canvas.height/2;
