@@ -234,6 +234,7 @@ input[type=file]{display:none}
       <div class="card"><div class="ch"><span class="ct">Top posiciones</span></div><div class="cb" id="top-b"><div class="empty"><p>Sin datos</p></div></div></div>
     </div>
     <div class="card"><div class="ch"><span class="ct">Resumen posiciones</span></div><div id="res-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
+    <div class="card"><div class="ch"><span class="ct">Evolución de la inversión</span></div><div id="evo-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
   </div>
 
   <div id="tab-pos" class="tp">
@@ -429,7 +430,7 @@ function loadFromStorage(){
     var raw=localStorage.getItem(SK);
     if(!raw){setSaveTxt('Sin datos previos','');return;}
     var saved=JSON.parse(raw);
-    if(saved.clients){clients=saved.clients;Object.values(clients).forEach(function(c){calcC(c);});}
+    if(saved.clients){clients=saved.clients;Object.values(clients).forEach(function(c){saneaTA(c);calcC(c);});}
     if(saved.activeId!==undefined)activeId=saved.activeId;
     setSaveTxt('Datos cargados ✓','saved');
   }catch(e){setSaveTxt('Error al cargar','');}
@@ -508,6 +509,7 @@ function tcFB(){return parseFloat(g('tc-mep').value)||1429.69;}
 function tcCable(){return parseFloat(g('tc-cable').value)||1478.19;}
 function tcHoy(){var fs=Object.keys(tcH).sort();return fs.length?tcH[fs[fs.length-1]]:tcFB();}
 function toARS(v,m,f){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*getTCd(f);}
+function toUSD(v,m,f){if(m==='Pesos')return v/getTCd(f);if(m==='US Dollar (Cable)')return v/tcCable();return v;}
 function toARSn(v,m){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*tcHoy();}
 function isUSD(m){return m==='Dólares'||m==='US Dollar (Cable)'||m==='Dólares C.V. 7000';}
 
@@ -575,6 +577,16 @@ function getTipo(t,d){
   if(u.includes('BONO'))return 'Bono';
   if(u.includes('REGS')||u.includes('VTO.'))return 'ON';
   return 'Acción';
+}
+// Corrige el campo 'ta' de cada boleto según la clasificación real (TMAP/ticker/descripción).
+// 'Fondo' sólo es válido si el ticker está explícitamente mapeado como tal en TMAP;
+// cualquier otro boleto con ta='Fondo' quedó mal etiquetado (bug histórico) y se recalcula.
+function saneaTA(c){
+  if(!c||!c.boletos)return;
+  c.boletos.forEach(function(b){
+    if(TMAP[b.ticker])b.ta=TMAP[b.ticker];
+    else if(b.ta==='Fondo')b.ta=getTipo(b.ticker,b.desc);
+  });
 }
 function pc(t){return 'pill '+({'Acción':'pa','Bono':'pb','CEDEAR':'pc','ON':'po','Letra':'pl','Fondo':'pf'}[t]||'pa');}
 function parseLetra(tk){
@@ -696,6 +708,7 @@ function handleBol(e){
 function parseBol(data){
   if(!activeId||!clients[activeId])return;
   var c=clients[activeId];
+  saneaTA(c);
   // Conservar boletos de fondos
   var fondos=c.boletos.filter(function(b){return b.ta==='Fondo';});
   c.boletos=fondos;
@@ -939,7 +952,7 @@ function calcC(c){
 // ═══ RENDER ═══
 function renderAll(){
   var d=getData();
-  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderPos();renderHist();renderBol();renderFlujos();
+  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderEvo(d);renderPos();renderHist();renderBol();renderFlujos();
   var cb=g('conban');
   if(d.isCon&&Object.keys(clients).length){cb.style.display='flex';g('conct').textContent='Vista consolidada — '+Object.keys(clients).length+' clientes';}
   else cb.style.display='none';
@@ -1018,6 +1031,50 @@ function renderRes(d){
     h+='<tr><td><strong>'+p.ticker+'</strong></td><td><span class="'+pc(p.tipo)+'">'+p.tipo+'</span></td>'+(d.isCon?'<td><span class="pill pcl">'+cn+'</span></td>':'')+'<td class="num">'+p.cantTotal.toLocaleString('es-AR')+'</td><td class="num">'+fP(cA)+'</td><td class="num">'+(va!=null?fP(va):'—')+'</td><td class="num '+(gan!=null?cc(gan):'')+'">'+(gan!=null?fP(gan):'—')+'</td><td class="'+(r!=null?cc(r):'')+'">'+(r!=null?fPct(r):'—')+'</td><td class="'+(t_!=null?cc(t_):'')+'">'+(t_!=null?fTNA(t_):'—')+'</td></tr>';
   });
   h+='</tbody></table></div>';g('res-b').innerHTML=h;
+}
+
+function renderEvo(d){
+  var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
+  var ventas=(d.boletos||[]).filter(function(b){return b.tipo==='VENTA';});
+  if(!compras.length){g('evo-b').innerHTML='<div class="empty"><p>Sin boletos importados</p></div>';return;}
+  var fechaInicio=compras.reduce(function(min,b){return (!min||b.conc<min)?b.conc:min;},null);
+  var hoy=new Date().toISOString().substring(0,10);
+  var dias=dds(fechaInicio,hoy);
+
+  var pos=Object.values(d.posiciones).filter(function(p){return p.cantTotal>0;});
+  var tcHoyVal=tcHoy();
+  var tARS=0;
+  pos.forEach(function(p){var pr=d.precios[p.ticker];tARS+=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);});
+  var tUSD=tARS/tcHoyVal;
+
+  var puestoARS=0,puestoUSD=0,recibidoARS=tARS,recibidoUSD=tUSD;
+  compras.forEach(function(b){puestoARS+=toARS(b.neto,b.moneda,b.conc);puestoUSD+=toUSD(b.neto,b.moneda,b.conc);});
+  ventas.forEach(function(b){recibidoARS+=toARS(b.neto,b.moneda,b.conc);recibidoUSD+=toUSD(b.neto,b.moneda,b.conc);});
+  (d.flujos||[]).forEach(function(f){recibidoARS+=f.importeARS;recibidoUSD+=toUSD(f.importe,f.moneda,f.fecha);});
+
+  var ganARS=recibidoARS-puestoARS,ganUSD=recibidoUSD-puestoUSD;
+  var retARS=puestoARS>0?(ganARS/puestoARS)*100:0;
+  var retUSD=puestoUSD>0?(ganUSD/puestoUSD)*100:0;
+  var tnaARS=dias>0?(retARS/dias)*365:0;
+  var tnaUSD=dias>0?(retUSD/dias)*365:0;
+  var fechaDisp=new Date(fechaInicio+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  var h='<div class="rs" style="margin-bottom:2px"><div class="rsi"><div class="rsl">Invirtiendo desde</div><div class="rsv">'+fechaDisp+'</div></div><div class="rsi"><div class="rsl">Días transcurridos</div><div class="rsv">'+dias.toLocaleString('es-AR')+'</div></div></div>';
+  h+='<div class="two" style="margin-top:10px">';
+  [['ARS',puestoARS,recibidoARS,ganARS,retARS,tnaARS,fP],['USD',puestoUSD,recibidoUSD,ganUSD,retUSD,tnaUSD,fU]].forEach(function(m){
+    var mon=m[0],puesto=m[1],recibido=m[2],gan=m[3],ret=m[4],tna=m[5],fmt=m[6];
+    h+='<div class="card" style="margin-bottom:0">';
+    h+='<div class="ch"><span class="ct">Evolución en '+mon+'</span></div>';
+    h+='<div class="rs">';
+    h+='<div class="rsi"><div class="rsl">Total invertido</div><div class="rsv">'+fmt(puesto)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Total recibido + cartera</div><div class="rsv">'+fmt(recibido)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Ganancia</div><div class="rsv '+cc(gan)+'">'+fmt(gan)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Retorno total</div><div class="rsv '+cc(ret)+'">'+fPct(ret)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">TNA</div><div class="rsv '+cc(tna)+'">'+fTNA(tna)+'</div></div>';
+    h+='</div></div>';
+  });
+  h+='</div>';
+  g('evo-b').innerHTML=h;
 }
 
 function renderPos(){
