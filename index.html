@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portfolio Tracker · Balanz Capital</title>
+<title>DA Financial & Business Advisor · Portfolio Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -171,7 +171,7 @@ input[type=file]{display:none}
 <div class="sb">
   <div class="sb-brand">
     <div class="b-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#0B1628" stroke-width="2.5" stroke-linecap="round"><path d="M3 17l4-8 4 4 4-6 4 10M3 17h18"/></svg></div>
-    <div><div class="b-name">Portfolio Tracker</div><div class="b-sub">Balanz Capital</div></div>
+    <div><div class="b-name">DA Financial & Business Advisor</div><div class="b-sub">Portfolio Tracker</div></div>
   </div>
   <div class="sb-lbl">Clientes</div>
   <div class="cl" id="cl"></div>
@@ -1327,11 +1327,11 @@ function exportPDF(){
 
   function pageHeader(titulo){
     return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.1)">'
-      +'<div><div style="font-size:20px;font-weight:700">Portfolio Tracker</div><div style="font-size:11px;color:#c9922a;letter-spacing:.08em">BALANZ CAPITAL · '+titulo.toUpperCase()+'</div></div>'
+      +'<div><div style="font-size:20px;font-weight:700">DA Financial & Business Advisor</div><div style="font-size:11px;color:#c9922a;letter-spacing:.08em">PORTFOLIO TRACKER · '+titulo.toUpperCase()+'</div></div>'
       +'<div style="text-align:right"><div style="font-size:14px;font-weight:600">'+label+'</div><div style="font-size:11px;color:#a8a49c">Reporte al '+fecha+' · TC $'+Math.round(tcHoyVal).toLocaleString('es-AR')+'</div></div></div>';
   }
   function pageFooter(n,total){
-    return '<div style="margin-top:24px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#666260;display:flex;justify-content:space-between"><span>Generado por Portfolio Tracker · Balanz Capital</span><span>Página '+n+' de '+total+' · '+fecha+'</span></div>';
+    return '<div style="margin-top:24px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);font-size:10px;color:#666260;display:flex;justify-content:space-between"><span>Generado por DA Financial & Business Advisor · Portfolio Tracker</span><span>Página '+n+' de '+total+' · '+fecha+'</span></div>';
   }
 
   function htmlDashboard(){
