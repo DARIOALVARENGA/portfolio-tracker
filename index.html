@@ -430,7 +430,7 @@ function loadFromStorage(){
     var raw=localStorage.getItem(SK);
     if(!raw){setSaveTxt('Sin datos previos','');return;}
     var saved=JSON.parse(raw);
-    if(saved.clients){clients=saved.clients;Object.values(clients).forEach(function(c){saneaTA(c);calcC(c);});}
+    if(saved.clients){clients=saved.clients;Object.values(clients).forEach(function(c){saneaTA(c);dedupBoletos(c);calcC(c);});}
     if(saved.activeId!==undefined)activeId=saved.activeId;
     setSaveTxt('Datos cargados ✓','saved');
   }catch(e){setSaveTxt('Error al cargar','');}
@@ -588,6 +588,28 @@ function saneaTA(c){
     else if(b.ta==='Fondo')b.ta=getTipo(b.ticker,b.desc);
   });
 }
+// Elimina boletos duplicados que representan la misma operación real (mismo ticker+tipo+fecha+cantidad),
+// quedándose con el que tenga liquidación real (liq!==conc); si no hay diferencia, con el último importado.
+// No toca boletos ta='Fondo' (se protegen aparte y no deberían tener este tipo de duplicado).
+function dedupBoletos(c){
+  if(!c||!c.boletos)return;
+  var grupos={};
+  c.boletos.forEach(function(b){
+    if(b.ta==='Fondo'){if(!grupos['__fondo_'+b.num+'_'+Math.random()])grupos['__fondo_'+b.num+'_'+Math.random()]=[];return;}
+    var key=b.ticker+'|'+b.tipo+'|'+b.conc+'|'+b.cant;
+    (grupos[key]=grupos[key]||[]).push(b);
+  });
+  var fondos=c.boletos.filter(function(b){return b.ta==='Fondo';});
+  var limpios=[];
+  Object.keys(grupos).forEach(function(key){
+    if(key.indexOf('__fondo_')===0)return;
+    var arr=grupos[key];
+    if(arr.length===1){limpios.push(arr[0]);return;}
+    var bueno=arr.filter(function(b){return b.liq&&b.liq!==b.conc;});
+    limpios.push(bueno.length?bueno[bueno.length-1]:arr[arr.length-1]);
+  });
+  c.boletos=fondos.concat(limpios);
+}
 function pc(t){return 'pill '+({'Acción':'pa','Bono':'pb','CEDEAR':'pc','ON':'po','Letra':'pl','Fondo':'pf'}[t]||'pa');}
 function parseLetra(tk){
   if(!tk||tk[0]!=='S'||tk.length<5)return null;
@@ -709,6 +731,7 @@ function parseBol(data){
   if(!activeId||!clients[activeId])return;
   var c=clients[activeId];
   saneaTA(c);
+  dedupBoletos(c);
   // Conservar boletos de fondos
   var fondos=c.boletos.filter(function(b){return b.ta==='Fondo';});
   c.boletos=fondos;
