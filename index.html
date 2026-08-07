@@ -1430,11 +1430,14 @@ function exportPDF(){
 
   function htmlDashboard(){
     var h=pageHeader('Dashboard');
-    h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px">';
+    var flujosKpi=(d.flujos||[]).filter(function(f){return f.tipo!=='Amortización';});
+    var flARS=flujosKpi.reduce(function(s,f){return s+f.importeARS;},0);
+    h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:8px">';
     h+=kpiCard('Cartera total',fP(tARS));
     h+=kpiCard('Costo invertido',fP(cARS));
     h+=kpiCard('Result. no realizado',fP(gan)+' ('+fPct(rp)+')',gan>=0?GREEN:RED);
     h+=kpiCard('Result. realizado',fP(rARS),rARS>=0?GREEN:RED);
+    h+=kpiCard('Flujos cobrados',fP(flARS),GREEN);
     h+='</div>';
 
     var grupos={};pos.forEach(function(p){if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
