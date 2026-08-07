@@ -261,12 +261,12 @@ input[type=file]{display:none}
         </button>
       </div>
       <div class="rs">
-        <div class="rsi"><div class="rsl">Result. ARS</div><div class="rsv" id="rs-ars">—</div></div>
-        <div class="rsi"><div class="rsl">Result. USD</div><div class="rsv" id="rs-usd">—</div></div>
+        <div class="rsi"><div class="rsl">Resultado</div><div class="rsv" id="rs-tot">—</div></div>
         <div class="rsi"><div class="rsl">Flujos incl.</div><div class="rsv" id="rs-fl">—</div></div>
         <div class="rsi"><div class="rsl">Ops. cerradas</div><div class="rsv" id="rs-ops">—</div></div>
         <div class="rsi"><div class="rsl">Rent. prom.</div><div class="rsv" id="rs-rent">—</div></div>
       </div>
+      <div id="hist-chart" style="margin:14px 0"></div>
       <div class="tb">
         <select id="f-ht" onchange="renderHist()"><option value="">Todos los tickers</option></select>
         <select id="f-hr" onchange="renderHist()"><option value="">Gan. y pérd.</option><option value="pos">Ganancias</option><option value="neg">Pérdidas</option></select>
@@ -1094,7 +1094,7 @@ function renderKPIs(d){
   g('k-ganp').textContent=fPct(rp);sv('k-pos',cnt);g('k-ops').textContent='';
   sv('k-real',fCcy(rARS,rUSD),cc(rARS));g('k-rusd').textContent=fU(rUSD);
   sv('k-fl',fCcy(flARS,flUSD),'pos');g('k-fls').textContent=flujosR.length+' cobros';
-  sa('rs-ars',fP(rARS),cc(rARS));sa('rs-usd',fU(rUSD),cc(rUSD));
+  sa('rs-tot',fCcy(rARS,rUSD),cc(rARS));
   var flTot=opsCerradas.reduce(function(s,o){return s+(o.flujosARS||0);},0);
   sa('rs-fl',fP(flTot));g('rs-ops').textContent=opsCerradas.length;
   var avg=opsCerradas.length?opsCerradas.reduce(function(s,o){return s+o.rentPct;},0)/opsCerradas.length:0;
@@ -1338,8 +1338,44 @@ function toggleRow(id){
   if(ico)ico.textContent=v?'▶':'▼';
 }
 
+function renderHistChart(d){
+  var el=g('hist-chart');
+  if(!el)return;
+  if(!d.opsCerradas.length){el.innerHTML='';return;}
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var byT={};
+  d.opsCerradas.forEach(function(o){
+    if(!byT[o.ticker])byT[o.ticker]={ticker:o.ticker,gan:0};
+    byT[o.ticker].gan+=isU?o.ganUSD:o.ganARS;
+  });
+  var items=Object.values(byT).sort(function(a,b){return b.gan-a.gan;});
+  var total=items.reduce(function(s,x){return s+x.gan;},0);
+  var maxAbs=items.reduce(function(m,x){return Math.max(m,Math.abs(x.gan));},1);
+  var h='<div class="ch" style="padding:0 0 10px"><span class="ct" style="font-size:12px">Resultado por activo</span></div>';
+  items.forEach(function(x){
+    var pct=Math.min(50,Math.abs(x.gan)/maxAbs*50);
+    var color=x.gan>=0?'var(--pos)':'var(--neg)';
+    var side=x.gan>=0?'left':'right';
+    h+='<div style="display:flex;align-items:center;margin-bottom:7px;font-size:12px">'
+      +'<div style="width:70px;font-weight:600">'+x.ticker+'</div>'
+      +'<div style="flex:1;position:relative;height:14px;background:var(--sf2);border-radius:3px">'
+      +'<div style="position:absolute;left:50%;top:-2px;width:1px;height:18px;background:var(--bd2)"></div>'
+      +'<div style="position:absolute;'+side+':50%;top:1px;height:12px;width:'+pct+'%;background:'+color+';border-radius:2px"></div>'
+      +'</div>'
+      +'<div style="width:100px;text-align:right;font-weight:600;color:'+color+'">'+fx(x.gan)+'</div>'
+      +'</div>';
+  });
+  h+='<div style="display:flex;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd2);font-size:13px">'
+    +'<div style="width:70px;font-weight:800">TOTAL</div>'
+    +'<div style="flex:1"></div>'
+    +'<div style="width:100px;text-align:right;font-weight:800;color:'+(total>=0?'var(--pos)':'var(--neg)')+'">'+fx(total)+'</div>'
+    +'</div>';
+  el.innerHTML=h;
+}
 function renderHist(){
   var d=getData();
+  renderHistChart(d);
   if(!d.opsCerradas.length){g('hist-b').innerHTML='<div class="empty"><p>Sin operaciones cerradas</p></div>';return;}
   var ft=g('f-ht')?g('f-ht').value:'';
   var fr=g('f-hr')?g('f-hr').value:'';
