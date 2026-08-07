@@ -560,7 +560,7 @@ function fetchPx(force){
 
 // ═══ STATE ═══
 var clients={},activeId=null;
-var TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',AE38:'Bono',AL41:'Bono',AL29:'Bono',GD29:'Bono',GD38:'Bono',GD41:'Bono',GD46:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR','KO.E':'Acción',AAPL:'CEDEAR',GE:'CEDEAR',AXP:'CEDEAR',BBD:'CEDEAR',NU:'CEDEAR',EMBJ:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON',YMCJO:'ON',EQUITYSA:'Fondo'};
+var TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',AE38:'Bono',AL41:'Bono',AL29:'Bono',GD29:'Bono',GD38:'Bono',GD41:'Bono',GD46:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR','KO.E':'Acción',AAPL:'CEDEAR',GE:'CEDEAR',AXP:'CEDEAR',BBD:'CEDEAR',NU:'CEDEAR',EMBJ:'CEDEAR',EWZ:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON',YMCJO:'ON',EQUITYSA:'Fondo'};
 var TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Fondo':'#E040FB','Otro':'#5F5E5A'};
 var ACOLS=['#185FA5','#0F6E56','#534AB7','#854F0B','#A32D2D','#3B6D11','#712B13'];
 var MESC={E:1,F:2,M:3,A:4,Y:5,J:6,L:7,G:8,P:9,O:10,N:11,D:12};
@@ -905,6 +905,7 @@ function parseHO(data){
     else return;
     var ticker=(row['Ticker']||'').toString().trim();
     if(!ticker)return;
+    if(TMAP[ticker]!=='Fondo')return; // esta sección es solo para Fondos; otros tickers vienen por Boletos/IOL y no deben duplicarse acá
     var cantOp=parseFloat((row['Cantidad Operada']||row['Cantidad']||'0').toString().replace(',','.'))||0;
     var precioOp=parseFloat((row['Precio Operado']||row['Precio']||'0').toString().replace(',','.'))||0;
     if(cantOp<=0||cantOp===-1)return;
