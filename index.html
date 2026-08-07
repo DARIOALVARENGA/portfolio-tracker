@@ -441,7 +441,7 @@ function saveToStorage(){
     var s={activeId:activeId,savedAt:Date.now(),clients:{}};
     Object.entries(clients).forEach(function(e){
       var id=e[0],c=e[1];
-      s.clients[id]={id:c.id,name:c.name,comitente:c.comitente,boletos:c.boletos,flujos:c.flujos||[],precios:c.precios,_pxM:c._pxM||{}};
+      s.clients[id]={id:c.id,name:c.name,comitente:c.comitente,boletos:c.boletos,flujos:c.flujos||[],depositos:c.depositos||[],precios:c.precios,_pxM:c._pxM||{}};
     });
     localStorage.setItem(SK,JSON.stringify(s));
     setSaveTxt('Guardado '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}),'saved');
@@ -688,9 +688,9 @@ function renderCL(){
 function getData(){
   if(activeId&&clients[activeId]){
     var c=clients[activeId];
-    return{boletos:c.boletos,precios:c.precios,posiciones:c.posiciones,opsCerradas:c.opsCerradas,flujos:c.flujos||[],isCon:false};
+    return{boletos:c.boletos,precios:c.precios,posiciones:c.posiciones,opsCerradas:c.opsCerradas,flujos:c.flujos||[],depositos:c.depositos||[],isCon:false};
   }
-  var bols=[],pos={},ops=[],prs={},fls=[];
+  var bols=[],pos={},ops=[],prs={},fls=[],deps=[];
   Object.values(clients).forEach(function(c){
     bols.push.apply(bols,c.boletos);
     Object.assign(prs,c.precios);
@@ -706,6 +706,7 @@ function getData(){
     });
     ops.push.apply(ops,(c.opsCerradas||[]).map(function(o){return Object.assign({},o,{_cl:c.name});}));
     fls.push.apply(fls,(c.flujos||[]).map(function(f){return Object.assign({},f,{_cl:c.name});}));
+    deps.push.apply(deps,(c.depositos||[]).map(function(dp){return Object.assign({},dp,{_cl:c.name});}));
   });
   var today=new Date().toISOString().substring(0,10);
   Object.values(pos).forEach(function(p){
@@ -713,7 +714,7 @@ function getData(){
     if(tc2>0){var dp=0;p.compras.forEach(function(x){dp+=(x.cant/tc2)*dds(x.conc,today);});p.diasProm=Math.round(dp);}
     p.precioCosto=tc2>0?p.costoTotal/tc2:0;
   });
-  return{boletos:bols,precios:prs,posiciones:pos,opsCerradas:ops,flujos:fls,isCon:true};
+  return{boletos:bols,precios:prs,posiciones:pos,opsCerradas:ops,flujos:fls,depositos:deps,isCon:true};
 }
 
 // ═══ IMPORT BOLETOS ═══
@@ -802,16 +803,27 @@ function handleCC(e){
 }
 function parseCC(data){
   if(!activeId||!clients[activeId])return;
-  var c=clients[activeId];c.flujos=[];
+  var c=clients[activeId];c.flujos=[];c.depositos=[];
   var esFmtModerno=data.length>0&&('Descripcion' in data[0]||'Descripción' in data[0])&&'Importe' in data[0]&&!('Tipo' in data[0]);
   data.forEach(function(row){
     var desc=(row['Descripcion']||row['Descripción']||'').toString().trim();
     var fecha=(row['Fecha']||'').toString().substring(0,10);
     var moneda=(row['Moneda']||row['moneda']||'Pesos').toString().trim();
     var importe=parseFloat((row['Importe']||'0').toString().replace(',','.'))||0;
-    if(!desc||!fecha||importe<=0)return;
+    if(!desc||!fecha||importe===0)return;
     var partes=desc.split('/').map(function(p){return p.trim();});
     var tipoRaw=partes[0].trim();
+    // Movimientos de capital real: dinero que entra/sale de la cuenta desde/hacia afuera del broker
+    // (a diferencia de Renta/Dividendo/Amortización, que son retorno de inversiones ya hechas)
+    if(tipoRaw==='Recibo de Cobro'){
+      var monedaDep=moneda;
+      if(monedaDep==='Dólares C.V. 7000'||monedaDep==='Dólares C.V.'||monedaDep==='Dólares C.V')monedaDep='Dólares';
+      else if(monedaDep==='Dólares'||monedaDep==='USD')monedaDep='Dólares';
+      else monedaDep='Pesos';
+      c.depositos.push({fecha:fecha,monto:Math.abs(importe),moneda:monedaDep,signo:importe>0?1:-1});
+      return;
+    }
+    if(importe<=0)return;
     var ticker=partes.length>1?partes[partes.length-1].trim():'';
     var tipoNorm='';
     if(esFmtModerno){
@@ -842,7 +854,8 @@ function parseCC(data){
     Object.entries(byT).forEach(function(e){sh+='<div class="ccs"><div class="ccsl">'+e[0]+'</div><div class="ccsv" style="color:var(--pos)">'+fP(e[1])+'</div></div>';});
     b.innerHTML=sh;
   }
-  g('msg-cc').innerHTML='<div class="al al-ok">✓ <strong>'+c.flujos.length+' flujos</strong> · '+c.flujos.filter(function(f){return f.tipo==='Amortización';}).length+' amort. · '+c.flujos.filter(function(f){return f.tipo==='Renta';}).length+' rentas · '+c.flujos.filter(function(f){return f.tipo==='Dividendo';}).length+' dividendos</div>';
+  var depTxt=c.depositos.length?(' · '+c.depositos.length+' depósitos de capital'):'';
+  g('msg-cc').innerHTML='<div class="al al-ok">✓ <strong>'+c.flujos.length+' flujos</strong> · '+c.flujos.filter(function(f){return f.tipo==='Amortización';}).length+' amort. · '+c.flujos.filter(function(f){return f.tipo==='Renta';}).length+' rentas · '+c.flujos.filter(function(f){return f.tipo==='Dividendo';}).length+' dividendos'+depTxt+'</div>';
   scheduleSave();
 }
 
@@ -1066,6 +1079,17 @@ function calcCapitalPico(compras,ventas,flujos,convFn){
   eventos.forEach(function(e){cum+=e.delta;if(cum<pico)pico=cum;});
   return {pico:-pico,cumFinal:cum};
 }
+// Capital realmente aportado por el cliente (depósitos - retiros reales a la cuenta, ej. "Recibo de Cobro"),
+// a diferencia de calcCapitalPico que reconstruye el capital en juego a partir de compras/ventas/flujos.
+// Esta es la medida correcta de "cuánta plata puso el cliente", sin contar como nuevo lo que ya estaba
+// adentro y se reinvirtió.
+function calcCapitalDepositado(depositos,convFn){
+  var eventos=depositos.map(function(dp){return {fecha:dp.fecha,delta:dp.signo*convFn(dp.monto,dp.moneda,dp.fecha)};});
+  eventos.sort(function(a,b){if(a.fecha!==b.fecha)return a.fecha.localeCompare(b.fecha);return b.delta-a.delta;});
+  var cum=0,pico=0;
+  eventos.forEach(function(e){cum+=e.delta;if(cum>pico)pico=cum;});
+  return {pico:pico,cumFinal:cum};
+}
 
 function renderEvo(d){
   var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
@@ -1082,11 +1106,20 @@ function renderEvo(d){
   var tUSD=tARS/tcHoyVal;
 
   var flujos=d.flujos||[];
-  var evARS=calcCapitalPico(compras,ventas,flujos,toARS);
-  var evUSD=calcCapitalPico(compras,ventas,flujos,toUSD);
-  // "puesto" = capital pico realmente en juego (no la suma de todas las compras, que duplicaría plata reciclada por ventas/recompras)
-  var puestoARS=evARS.pico,puestoUSD=evUSD.pico;
-  var ganARS=evARS.cumFinal+tARS,ganUSD=evUSD.cumFinal+tUSD;
+  var depositos=d.depositos||[];
+  var usaDepositos=depositos.length>0;
+  var evARS,evUSD,puestoARS,puestoUSD,ganARS,ganUSD;
+  if(usaDepositos){
+    // Método correcto: capital = depósitos reales a la cuenta (ej. transferencias del cliente)
+    evARS=calcCapitalDepositado(depositos,toARS);evUSD=calcCapitalDepositado(depositos,toUSD);
+    puestoARS=evARS.pico;puestoUSD=evUSD.pico;
+    ganARS=tARS-evARS.cumFinal;ganUSD=tUSD-evUSD.cumFinal;
+  }else{
+    // Respaldo: sin depósitos importados, se estima por compra/venta/flujos (puede sobreestimar si hubo reinversión)
+    evARS=calcCapitalPico(compras,ventas,flujos,toARS);evUSD=calcCapitalPico(compras,ventas,flujos,toUSD);
+    puestoARS=evARS.pico;puestoUSD=evUSD.pico;
+    ganARS=evARS.cumFinal+tARS;ganUSD=evUSD.cumFinal+tUSD;
+  }
   var recibidoARS=puestoARS+ganARS,recibidoUSD=puestoUSD+ganUSD;
 
   var retARS=puestoARS>0?(ganARS/puestoARS)*100:0;
@@ -1102,18 +1135,25 @@ function renderEvo(d){
     h+='<div class="card" style="margin-bottom:0">';
     h+='<div class="ch"><span class="ct">Evolución en '+mon+'</span></div>';
     h+='<div class="rs">';
-    h+='<div class="rsi"><div class="rsl">Capital pico invertido</div><div class="rsv">'+fmt(puesto)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">Cartera actual + retiros</div><div class="rsv">'+fmt(recibido)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Capital'+(usaDepositos?' depositado':' pico')+'</div><div class="rsv">'+fmt(puesto)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Cartera actual + ventas y cobros</div><div class="rsv">'+fmt(recibido)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">Ganancia</div><div class="rsv '+cc(gan)+'">'+fmt(gan)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">Retorno total</div><div class="rsv '+cc(ret)+'">'+fPct(ret)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">TNA</div><div class="rsv '+cc(tna)+'">'+fTNA(tna)+'</div></div>';
     h+='</div></div>';
   });
   h+='</div>';
-  h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
-    +'<b>Capital pico invertido</b>: el máximo que estuvo puesto en algún momento (sin contar como "nuevo" el dinero reinvertido de ventas anteriores). '
-    +'<b>Cartera actual + retiros</b>: el valor de la cartera hoy, más todo lo que ya se cobró en el camino (ventas y flujos). La diferencia entre ambos es la ganancia total.'
-    +'</div>';
+  if(usaDepositos){
+    h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
+      +'<b>Capital depositado</b>: el máximo que el cliente aportó realmente a la cuenta (transferencias reales, según la Cuenta Corriente), no lo que se compró/vendió internamente. '
+      +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo vendido o cobrado en el camino, esté o no reinvertido. La diferencia entre ambos es la ganancia total.'
+      +'</div>';
+  }else{
+    h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
+      +'<b>Capital pico</b> (estimado): no se detectaron depósitos reales en la Cuenta Corriente, así que este número se reconstruye a partir de compras/ventas/flujos y puede estar un poco sobreestimado si hubo mucha reinversión. '
+      +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo vendido o cobrado en el camino. La diferencia entre ambos es la ganancia total.'
+      +'</div>';
+  }
   g('evo-b').innerHTML=h;
 }
 
@@ -1420,20 +1460,31 @@ function exportPDF(){
     });
     h+='</div></div>';
 
-    // Evolución de la inversión (capital pico / ganancia / valor final)
+    // Evolución de la inversión (capital depositado/pico / ganancia / cartera final)
     var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
     var ventas=(d.boletos||[]).filter(function(b){return b.tipo==='VENTA';});
+    var depositos=d.depositos||[];
+    var usaDepositos=depositos.length>0;
     if(compras.length){
-      var evARS=calcCapitalPico(compras,ventas,d.flujos||[],toARS);
-      var puestoARS=evARS.pico,gananciaARS=evARS.cumFinal+tARS,finalARS=puestoARS+gananciaARS;
+      var evARS,puestoARS,gananciaARS;
+      if(usaDepositos){
+        evARS=calcCapitalDepositado(depositos,toARS);
+        puestoARS=evARS.pico;gananciaARS=tARS-evARS.cumFinal;
+      }else{
+        evARS=calcCapitalPico(compras,ventas,d.flujos||[],toARS);
+        puestoARS=evARS.pico;gananciaARS=evARS.cumFinal+tARS;
+      }
+      var finalARS=puestoARS+gananciaARS;
       var maxAbs=Math.max(puestoARS,Math.abs(gananciaARS),finalARS,1);
       h+=sTitle('Evolución de la inversión (ARS)');
-      h+=barEvo('Capital pico invertido',puestoARS,maxAbs,NAVY2);
+      h+=barEvo('Capital'+(usaDepositos?' depositado':' pico'),puestoARS,maxAbs,NAVY2);
       h+=barEvo('Ganancia total',gananciaARS,maxAbs,gananciaARS>=0?GREEN:RED);
-      h+=barEvo('Cartera actual + retiros',finalARS,maxAbs,NAVY);
+      h+=barEvo('Cartera actual + ventas y cobros',finalARS,maxAbs,NAVY);
       h+='<div style="font-size:9.5px;color:'+MUTED+';margin-top:8px;line-height:1.5">'
-        +'<b>Capital pico invertido</b>: el máximo que estuvo puesto en algún momento (no cuenta dos veces el dinero reinvertido de ventas anteriores). '
-        +'<b>Cartera actual + retiros</b>: valor de la cartera hoy más todo lo ya cobrado en el camino (ventas y flujos). La diferencia entre ambos es la ganancia total.'
+        +(usaDepositos
+          ?'<b>Capital depositado</b>: el máximo que el cliente aportó realmente a la cuenta (transferencias reales). '
+          :'<b>Capital pico</b> (estimado): sin depósitos reales detectados, se reconstruye por compras/ventas/flujos. ')
+        +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo que se vendió o cobró en el camino, esté o no reinvertido. La diferencia entre ambos es la ganancia total.'
         +'</div>';
     }
     return h;
