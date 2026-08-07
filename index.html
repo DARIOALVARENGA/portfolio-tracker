@@ -994,20 +994,28 @@ function calcC(c){
       var pu=x.neto/x.cant;
       return s+toARS(pu*x.cr,x.moneda,x.conc);
     },0);
+    p.costoTotalUSD=colaC.reduce(function(s,x){
+      if(x.cr<=0)return s;
+      var pu=x.neto/x.cant;
+      return s+toUSD(pu*x.cr,x.moneda,x.conc);
+    },0);
     p.flujosARS=(fByTk[p.ticker]?fByTk[p.ticker].ars:0)||0;
     if(tc2>0){var dp=0;p.compras.forEach(function(x){dp+=(x.cant/tc2)*dds(x.conc,today);});p.diasProm=Math.round(dp);}else p.diasProm=0;
     var esVencida=(p.tipo==='Letra'&&letraVencida(p.ticker))||(p.tipo==='ON'&&onVencida(p.ticker));
     if(p.cantTotal>0&&esVencida){
       var fvStr=p.tipo==='ON'?onVStr(p.ticker):letraVStr(p.ticker);
       var costoARS=p.costoTotalARS;
+      var costoUSD=p.costoTotalUSD;
       var amortReal=(fByTk[p.ticker]?fByTk[p.ticker].items.filter(function(f){return f.tipo==='Amortización';}).reduce(function(s,f){return s+f.importeARS;},0):0)||0;
+      var amortRealUSD=(fByTk[p.ticker]?fByTk[p.ticker].items.filter(function(f){return f.tipo==='Amortización';}).reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0):0)||0;
       var ingresoARS=amortReal>0?amortReal:toARS(p.cantTotal*1,p.moneda,fvStr||today);
+      var ingresoUSD=amortRealUSD>0?amortRealUSD:toUSD(p.cantTotal*1,p.moneda,fvStr||today);
       var ganARS=ingresoARS-costoARS;
-      var ganUSD=ganARS/getTCd(fvStr||today);
+      var ganUSD=ingresoUSD-costoUSD;
       var rentPct=costoARS>0?(ganARS/costoARS)*100:0;
       var cr=p.compras.sort(function(a,b){return a.conc.localeCompare(b.conc);})[0];
       var dt=cr&&fvStr?dds(cr.conc,fvStr):p.diasProm||1;
-      c.opsCerradas.push({ticker:p.ticker,desc:p.desc,tipo:p.tipo,moneda:p.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:fvStr||today,cant:p.cantTotal,costoARS:costoARS,ingresoARS:ingresoARS,flujosARS:0,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:true,tieneFX:false,tcUsado:getTCd(fvStr||today)});
+      c.opsCerradas.push({ticker:p.ticker,desc:p.desc,tipo:p.tipo,moneda:p.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:fvStr||today,cant:p.cantTotal,costoARS:costoARS,costoUSD:costoUSD,ingresoARS:ingresoARS,ingresoUSD:ingresoUSD,flujosARS:0,flujosUSD:0,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:true,tieneFX:false,tcUsado:getTCd(fvStr||today)});
       p.cantTotal=0;
     }
   });
@@ -1018,24 +1026,27 @@ function calcC(c){
     var ventas=c.boletos.filter(function(b){return b.ticker===ticker&&b.tipo==='VENTA';}).slice().sort(function(a,b){return a.conc.localeCompare(b.conc);});
     var cola=compras.map(function(x){return Object.assign({},x,{cr:x.cant});});
     ventas.forEach(function(v){
-      var cv=v.cant,costoARS=0,costoOrig=0,tieneFX=false;
+      var cv=v.cant,costoARS=0,costoUSD=0,costoOrig=0,tieneFX=false;
       for(var i=0;i<cola.length&&cv>0;i++){
         if(cola[i].cr<=0)continue;
         var m=Math.min(cv,cola[i].cr);
         var nu=cola[i].neto/cola[i].cant;
         costoOrig+=m*nu;
         costoARS+=toARS(m*nu,cola[i].moneda,cola[i].conc);
+        costoUSD+=toUSD(m*nu,cola[i].moneda,cola[i].conc);
         if(cola[i].moneda!==v.moneda)tieneFX=true;
         cola[i].cr-=m;cv-=m;
       }
       var ingresoARS=toARS(v.neto,v.moneda,v.conc);
+      var ingresoUSD=toUSD(v.neto,v.moneda,v.conc);
       var tcV=getTCd(v.conc);
       var flujosOp=(fByTk[ticker]?fByTk[ticker].items.filter(function(f){return f.fecha<=v.conc;}).reduce(function(s,f){return s+f.importeARS;},0):0)||0;
+      var flujosOpUSD=(fByTk[ticker]?fByTk[ticker].items.filter(function(f){return f.fecha<=v.conc;}).reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0):0)||0;
       var ganARS=(ingresoARS+flujosOp)-costoARS;
-      var ganUSD=ganARS/tcV;
+      var ganUSD=(ingresoUSD+flujosOpUSD)-costoUSD;
       var rentPct=costoARS>0?(ganARS/costoARS)*100:0;
       var cr=compras[0];var dt=cr?dds(cr.conc,v.conc):1;
-      c.opsCerradas.push({ticker:ticker,desc:pos?pos.desc:ticker,tipo:pos?pos.tipo:getTipo(ticker,''),moneda:v.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:v.conc,cant:v.cant,costoARS:costoARS,ingresoARS:ingresoARS,flujosARS:flujosOp,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:false,tieneFX:tieneFX,tcUsado:tcV});
+      c.opsCerradas.push({ticker:ticker,desc:pos?pos.desc:ticker,tipo:pos?pos.tipo:getTipo(ticker,''),moneda:v.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:v.conc,cant:v.cant,costoARS:costoARS,costoUSD:costoUSD,ingresoARS:ingresoARS,ingresoUSD:ingresoUSD,flujosARS:flujosOp,flujosUSD:flujosOpUSD,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:false,tieneFX:tieneFX,tcUsado:tcV});
     });
   });
 }
@@ -1344,9 +1355,9 @@ function renderHist(){
   var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th><th>Op.</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>F.compra</th><th>F.cierre</th><th>Días</th><th>Cant.</th><th>Costo</th><th>Ingreso</th><th>Flujos</th><th>Res.</th><th>Rent.%</th><th>TNA</th></tr></thead><tbody>';
   ops.sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
     var lbl=o.esVcto?'<span class="pill pv">Vcto.</span>':'<span class="pill psel">Venta</span>'+(o.tieneFX?'<span class="pill" style="font-size:9px;margin-left:2px;background:rgba(127,119,221,.12);color:#b0a9f5">FX</span>':'')+(o.flujosARS>0?'<span class="pill prt" style="font-size:9px;margin-left:2px">+CC</span>':'');
-    var costoV=isU?o.costoARS/tcHoyVal:o.costoARS;
-    var ingresoV=isU?o.ingresoARS/tcHoyVal:o.ingresoARS;
-    var flujosV=isU?(o.flujosARS||0)/tcHoyVal:o.flujosARS;
+    var costoV=isU?o.costoUSD:o.costoARS;
+    var ingresoV=isU?o.ingresoUSD:o.ingresoARS;
+    var flujosV=isU?(o.flujosUSD||0):o.flujosARS;
     var resV=isU?o.ganUSD:o.ganARS;
     h+='<tr><td><strong>'+o.ticker+'</strong></td><td><span class="'+pc(o.tipo)+'">'+o.tipo+'</span></td><td>'+lbl+'</td>'+(d.isCon?'<td><span class="pill pcl">'+((o._cl||'').split(' ')[0])+'</span></td>':'')+'<td class="num dim">'+o.fechaCompra+'</td><td class="num dim">'+o.fechaVenta+'</td><td class="num dim">'+o.diasTen+'</td><td class="num">'+o.cant.toLocaleString('es-AR')+'</td><td class="num">'+fx(costoV)+'</td><td class="num">'+fx(ingresoV)+'</td><td class="num '+(o.flujosARS>0?'pos':'dim')+'">'+(o.flujosARS>0?fx(flujosV):'—')+'</td><td class="num '+cc(resV)+'" style="font-weight:600">'+fx(resV)+'</td><td class="'+cc(o.rentPct)+'">'+fPct(o.rentPct)+'</td><td class="'+cc(o.tna)+'">'+fTNA(o.tna)+'</td></tr>';
   });
@@ -1617,10 +1628,7 @@ function exportPDF(){
     h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('F.Compra','right')+thd('F.Cierre','right')+thd('Días','right')+thd('Costo','right')+thd('Ingreso','right')+thd('Res.','right')+thd('Rent.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
     d.opsCerradas.slice().sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
       var rc=o.ganARS>=0?GREEN:RED;
-      var costoV=ccy==='USD'?o.costoARS/tcHoyVal:o.costoARS;
-      var ingresoV=ccy==='USD'?o.ingresoARS/tcHoyVal:o.ingresoARS;
-      var resV=ccy==='USD'?o.ganUSD:o.ganARS;
-      h+='<tr>'+tdd('<b>'+o.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+o.tipo+'</span>')+tdd(o.fechaCompra,'right','font-family:monospace;color:'+MUTED)+tdd(o.fechaVenta,'right','font-family:monospace;color:'+MUTED)+tdd(o.diasTen,'right','color:'+MUTED)+tdd(fc(costoV,costoV),'right','font-family:monospace')+tdd(fc(ingresoV,ingresoV),'right','font-family:monospace')+tdd(fc(resV,resV),'right','font-family:monospace;font-weight:700;color:'+rc)+tdd(fPct(o.rentPct),'right','font-weight:700;color:'+rc)+tdd(fTNA(o.tna),'right','color:'+rc)+'</tr>';
+      h+='<tr>'+tdd('<b>'+o.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+o.tipo+'</span>')+tdd(o.fechaCompra,'right','font-family:monospace;color:'+MUTED)+tdd(o.fechaVenta,'right','font-family:monospace;color:'+MUTED)+tdd(o.diasTen,'right','color:'+MUTED)+tdd(fc(o.costoARS,o.costoUSD),'right','font-family:monospace')+tdd(fc(o.ingresoARS,o.ingresoUSD),'right','font-family:monospace')+tdd(fc(o.ganARS,o.ganUSD),'right','font-family:monospace;font-weight:700;color:'+rc)+tdd(fPct(o.rentPct),'right','font-weight:700;color:'+rc)+tdd(fTNA(o.tna),'right','color:'+rc)+'</tr>';
     });
     h+='</tbody></table>';
     return h;
