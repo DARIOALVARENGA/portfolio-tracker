@@ -560,7 +560,7 @@ function fetchPx(force){
 
 // ═══ STATE ═══
 var clients={},activeId=null;
-var TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',AE38:'Bono',AL41:'Bono',AL29:'Bono',GD29:'Bono',GD38:'Bono',GD41:'Bono',GD46:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR','KO.E':'Acción',AAPL:'CEDEAR',GE:'CEDEAR',AXP:'CEDEAR',BBD:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON',YMCJO:'ON',EQUITYSA:'Fondo'};
+var TMAP={GGAL:'Acción',SUPV:'Acción',EDN:'Acción',YPFD:'Acción',AL35:'Bono',AL30:'Bono',GD30:'Bono',GD35:'Bono',AE38:'Bono',AL41:'Bono',AL29:'Bono',GD29:'Bono',GD38:'Bono',GD41:'Bono',GD46:'Bono',GOOGL:'CEDEAR',JPM:'CEDEAR',MELI:'CEDEAR',MSFT:'CEDEAR',VIST:'CEDEAR',GPRK:'CEDEAR',KO:'CEDEAR','KO.E':'Acción',AAPL:'CEDEAR',GE:'CEDEAR',AXP:'CEDEAR',BBD:'CEDEAR',NU:'CEDEAR',EMBJ:'CEDEAR',RUCDO:'ON',TLCMO:'ON',DNC7O:'ON',TLC1O:'ON',IRCFO:'ON',GNCXO:'ON',YMCIO:'ON',DNC5O:'ON',TLCPO:'ON',DNC6O:'ON',TLC2O:'ON',YCA6O:'ON',PER2A:'ON',BYCHO:'ON',OZC6O:'ON',MRCAO:'ON',YMCJO:'ON',EQUITYSA:'Fondo'};
 var TCOLORS={'Acción':'#378ADD','Bono':'#c9922a','CEDEAR':'#639922','ON':'#7F77DD','Letra':'#1D9E75','Fondo':'#E040FB','Otro':'#5F5E5A'};
 var ACOLS=['#185FA5','#0F6E56','#534AB7','#854F0B','#A32D2D','#3B6D11','#712B13'];
 var MESC={E:1,F:2,M:3,A:4,Y:5,J:6,L:7,G:8,P:9,O:10,N:11,D:12};
@@ -1103,13 +1103,17 @@ function renderEvo(d){
     h+='<div class="ch"><span class="ct">Evolución en '+mon+'</span></div>';
     h+='<div class="rs">';
     h+='<div class="rsi"><div class="rsl">Capital pico invertido</div><div class="rsv">'+fmt(puesto)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">Valor final equivalente</div><div class="rsv">'+fmt(recibido)+'</div></div>';
+    h+='<div class="rsi"><div class="rsl">Cartera actual + retiros</div><div class="rsv">'+fmt(recibido)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">Ganancia</div><div class="rsv '+cc(gan)+'">'+fmt(gan)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">Retorno total</div><div class="rsv '+cc(ret)+'">'+fPct(ret)+'</div></div>';
     h+='<div class="rsi"><div class="rsl">TNA</div><div class="rsv '+cc(tna)+'">'+fTNA(tna)+'</div></div>';
     h+='</div></div>';
   });
   h+='</div>';
+  h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
+    +'<b>Capital pico invertido</b>: el máximo que estuvo puesto en algún momento (sin contar como "nuevo" el dinero reinvertido de ventas anteriores). '
+    +'<b>Cartera actual + retiros</b>: el valor de la cartera hoy, más todo lo que ya se cobró en el camino (ventas y flujos). La diferencia entre ambos es la ganancia total.'
+    +'</div>';
   g('evo-b').innerHTML=h;
 }
 
@@ -1426,7 +1430,11 @@ function exportPDF(){
       h+=sTitle('Evolución de la inversión (ARS)');
       h+=barEvo('Capital pico invertido',puestoARS,maxAbs,NAVY2);
       h+=barEvo('Ganancia total',gananciaARS,maxAbs,gananciaARS>=0?GREEN:RED);
-      h+=barEvo('Valor final equivalente',finalARS,maxAbs,NAVY);
+      h+=barEvo('Cartera actual + retiros',finalARS,maxAbs,NAVY);
+      h+='<div style="font-size:9.5px;color:'+MUTED+';margin-top:8px;line-height:1.5">'
+        +'<b>Capital pico invertido</b>: el máximo que estuvo puesto en algún momento (no cuenta dos veces el dinero reinvertido de ventas anteriores). '
+        +'<b>Cartera actual + retiros</b>: valor de la cartera hoy más todo lo ya cobrado en el camino (ventas y flujos). La diferencia entre ambos es la ganancia total.'
+        +'</div>';
     }
     return h;
   }
