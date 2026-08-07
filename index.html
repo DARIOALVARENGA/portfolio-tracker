@@ -296,8 +296,7 @@ input[type=file]{display:none}
         </div>
       </div>
       <div class="rs">
-        <div class="rsi"><div class="rsl">Total ARS</div><div class="rsv" id="fl-ars">—</div></div>
-        <div class="rsi"><div class="rsl">Total USD</div><div class="rsv" id="fl-usd">—</div></div>
+        <div class="rsi"><div class="rsl">Total</div><div class="rsv" id="fl-tot">—</div></div>
         <div class="rsi"><div class="rsl">Registros</div><div class="rsv" id="fl-cnt">—</div></div>
       </div>
       <div id="flujos-b"><div class="empty"><p>Importá la Cuenta Corriente en Configurar</p></div></div>
@@ -1234,8 +1233,10 @@ function renderPos(){
   var grupos={};
   pos.forEach(function(p){if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
   var tcHoyVal=tcHoy();
-  var NC=d.isCon?17:16;
-  var h='<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual ARS</th><th style="text-align:right">Cartera ARS</th><th style="text-align:right">Inv.ARS</th><th style="text-align:right">Rend.ARS</th><th style="text-align:right">TNA ARS</th><th style="text-align:right">TC Actual</th><th style="text-align:right">Cartera USD</th><th style="text-align:right">TC Prom.Compra</th><th style="text-align:right">Inv.USD</th><th style="text-align:right">Rend.USD</th><th style="text-align:right">TNA USD</th></tr></thead><tbody>';
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var NC=d.isCon?10:9;
+  var h='<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual</th><th style="text-align:right">Cartera</th><th style="text-align:right">Inv.</th><th style="text-align:right">Rend.</th><th style="text-align:right">TNA</th></tr></thead><tbody>';
   orden.filter(function(t){return grupos[t];}).forEach(function(tipo){
     var items=grupos[tipo].sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);});
     h+='<tr><td colspan="'+NC+'" style="background:var(--sf2);padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)"><span class="'+pc(tipo)+'" style="margin-right:6px">'+tipo+'</span>'+items.length+' posición'+(items.length!==1?'es':'')+'</td></tr>';
@@ -1244,40 +1245,33 @@ function renderPos(){
       var pr=d.precios[p.ticker];
       var prDisp=pr?precioDisplay(pr,p.tipo):null;
       var cartARS=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):null;
-      var cartUSD=cartARS!=null?cartARS/tcHoyVal:null;
       var invARS=p.costoTotalARS||0;
       var invUSD=tcHoyVal>0?invARS/tcHoyVal:0;
-      var tcCompra=p.compras.length>0?p.compras.reduce(function(s,x){return s+getTCd(x.conc);},0)/p.compras.length:tcHoyVal;
       var fl=p.flujosARS||0;
       var rendARS=cartARS!=null?cartARS+fl-invARS:null;
       var rendARSpct=invARS>0&&rendARS!=null?(rendARS/invARS)*100:null;
-      var rendUSD=rendARS!=null?rendARS/tcHoyVal:null;
-      var rendUSDpct=invUSD>0&&rendUSD!=null?(rendUSD/invUSD)*100:null;
       var dias=p.diasProm||1;
       var tnaARS=rendARSpct!=null&&dias>0?(rendARSpct/dias)*365:null;
-      var tnaUSD=rendUSDpct!=null&&dias>0?(rendUSDpct/dias)*365:null;
       var venc=parseLetra(p.ticker);
       var dv=venc?Math.round((venc-new Date())/864e5):null;
       var vtag=dv!==null&&dv>=0&&dv<=30?' <span class="vt">'+dv+'d</span>':'';
       var cn='';
       if(d.isCon){var f=Object.values(clients).find(function(c){return c.posiciones&&c.posiciones[p.ticker]&&c.posiciones[p.ticker].cantTotal>0;});cn=f?f.name.split(' ')[0]:'';}
+      var prV=isU&&prDisp!=null?prDisp/tcHoyVal:prDisp;
+      var cartV=isU&&cartARS!=null?cartARS/tcHoyVal:cartARS;
+      var invV=isU?invUSD:invARS;
+      var rendV=isU&&rendARS!=null?rendARS/tcHoyVal:rendARS;
       h+='<tr style="cursor:pointer;background:var(--bg3)" onclick="toggleRow(\''+rowId+'\')">';
       h+='<td style="text-align:center;font-size:11px;color:var(--gold)" id="ico-'+rowId+'">▶</td>';
       h+='<td><strong>'+p.ticker+'</strong>'+vtag+'</td>';
       if(d.isCon)h+='<td><span class="pill pcl">'+cn+'</span></td>';
       h+='<td class="num" style="text-align:right;font-weight:600">'+p.cantTotal.toLocaleString('es-AR')+'</td>';
       h+='<td class="num dim" style="text-align:right">'+dias+'</td>';
-      h+='<td class="num" style="text-align:right">'+(prDisp!=null?fP(prDisp):'<span class="dim">—</span>')+'</td>';
-      h+='<td class="num" style="text-align:right;font-weight:600">'+(cartARS!=null?fP(cartARS):'<span class="dim">—</span>')+'</td>';
-      h+='<td class="num" style="text-align:right">'+fP(invARS)+'</td>';
-      h+='<td class="num '+(rendARS!=null?cc(rendARS):'')+'" style="text-align:right;font-weight:600">'+(rendARS!=null?fP(rendARS):'—')+'</td>';
+      h+='<td class="num" style="text-align:right">'+(prV!=null?fx(prV):'<span class="dim">—</span>')+'</td>';
+      h+='<td class="num" style="text-align:right;font-weight:600">'+(cartV!=null?fx(cartV):'<span class="dim">—</span>')+'</td>';
+      h+='<td class="num" style="text-align:right">'+fx(invV)+'</td>';
+      h+='<td class="num '+(rendV!=null?cc(rendV):'')+'" style="text-align:right;font-weight:600">'+(rendV!=null?fx(rendV):'—')+'</td>';
       h+='<td class="'+(tnaARS!=null?cc(tnaARS):'')+'" style="text-align:right">'+(tnaARS!=null?fTNA(tnaARS):'—')+'</td>';
-      h+='<td class="num dim" style="text-align:right">$'+Math.round(tcHoyVal).toLocaleString('es-AR')+'</td>';
-      h+='<td class="num dim" style="text-align:right">'+(cartUSD!=null?fU(cartUSD):'—')+'</td>';
-      h+='<td class="num dim" style="text-align:right">$'+Math.round(tcCompra).toLocaleString('es-AR')+'</td>';
-      h+='<td class="num dim" style="text-align:right">'+fU(invUSD)+'</td>';
-      h+='<td class="num '+(rendUSD!=null?cc(rendUSD):'')+'" style="text-align:right;font-weight:600">'+(rendUSD!=null?fU(rendUSD):'—')+'</td>';
-      h+='<td class="'+(tnaUSD!=null?cc(tnaUSD):'')+'" style="text-align:right">'+(tnaUSD!=null?fTNA(tnaUSD):'—')+'</td>';
       h+='</tr>';
       h+='<tbody id="'+rowId+'" style="display:none">';
       p.compras.forEach(function(x){
@@ -1289,40 +1283,31 @@ function renderPos(){
         var cartXARS=pr&&p.cantTotal>0?calcValorActualARS(pr,x.cant,p.tipo):null;
         var rendXARS=cartXARS!=null?cartXARS-invXARS:null;
         var rendXpct=invXARS>0&&rendXARS!=null?(rendXARS/invXARS)*100:null;
-        var rendXUSD=rendXARS!=null?rendXARS/tcHoyVal:null;
-        var rendXUSDpct=invXUSD>0&&rendXUSD!=null?(rendXUSD/invXUSD)*100:null;
         var tnaXARS=rendXpct!=null&&diasX>0?(rendXpct/diasX)*365:null;
-        var tnaXUSD=rendXUSDpct!=null&&diasX>0?(rendXUSDpct/diasX)*365:null;
+        var prXV=isU?prXARS/tcHoyVal:prXARS;
+        var invXV=isU?invXUSD:invXARS;
+        var rendXV=isU&&rendXARS!=null?rendXARS/tcHoyVal:rendXARS;
         h+='<tr style="background:var(--sf);font-size:11px">';
         h+='<td></td>';
         h+='<td style="padding-left:20px;color:var(--t3)">Compra '+x.conc+'</td>';
         if(d.isCon)h+='<td></td>';
         h+='<td class="num" style="text-align:right">'+x.cant.toLocaleString('es-AR')+'</td>';
         h+='<td class="num dim" style="text-align:right">'+diasX+'</td>';
-        h+='<td class="num dim" style="text-align:right">'+fP(prXARS)+'</td>';
+        h+='<td class="num dim" style="text-align:right">'+fx(prXV)+'</td>';
         h+='<td></td>';
-        h+='<td class="num" style="text-align:right">'+fP(invXARS)+'</td>';
-        h+='<td class="num '+(rendXARS!=null?cc(rendXARS):'')+'" style="text-align:right">'+(rendXARS!=null?fP(rendXARS):'—')+'</td>';
+        h+='<td class="num" style="text-align:right">'+fx(invXV)+'</td>';
+        h+='<td class="num '+(rendXV!=null?cc(rendXV):'')+'" style="text-align:right">'+(rendXV!=null?fx(rendXV):'—')+'</td>';
         h+='<td class="'+(tnaXARS!=null?cc(tnaXARS):'')+'" style="text-align:right">'+(tnaXARS!=null?fTNA(tnaXARS):'—')+'</td>';
-        h+='<td class="num dim" style="text-align:right">$'+Math.round(tcHoyVal).toLocaleString('es-AR')+'</td>';
-        h+='<td></td>';
-        h+='<td class="num dim" style="text-align:right">$'+Math.round(tcX).toLocaleString('es-AR')+'</td>';
-        h+='<td class="num dim" style="text-align:right">'+fU(invXUSD)+'</td>';
-        h+='<td class="num '+(rendXUSD!=null?cc(rendXUSD):'')+'" style="text-align:right">'+(rendXUSD!=null?fU(rendXUSD):'—')+'</td>';
-        h+='<td class="'+(tnaXUSD!=null?cc(tnaXUSD):'')+'" style="text-align:right">'+(tnaXUSD!=null?fTNA(tnaXUSD):'—')+'</td>';
         h+='</tr>';
       });
       d.flujos.filter(function(f){return f.ticker===p.ticker;}).forEach(function(f){
+        var fImp=isU?toUSD(f.importe,f.moneda,f.fecha):f.importeARS;
         h+='<tr style="background:var(--sf);font-size:11px">';
         h+='<td></td>';
         h+='<td style="padding-left:20px">'+(f.tipo==='Amortización'?'<span class="pill pv">Amort.</span>':f.tipo==='Dividendo'?'<span class="pill pdv">Div.</span>':'<span class="pill prt">Renta</span>')+' <span class="dim">'+f.fecha+'</span></td>';
         if(d.isCon)h+='<td></td>';
-        h+='<td></td><td></td><td></td><td></td><td></td>';
-        h+='<td class="num pos" style="text-align:right">'+fP(f.importeARS)+'</td>';
-        h+='<td></td>';
-        h+='<td class="num dim" style="text-align:right">'+(f.tcUsado?'$'+Math.round(f.tcUsado).toLocaleString('es-AR'):'—')+'</td>';
-        h+='<td></td><td></td>';
-        h+='<td class="num dim" style="text-align:right">'+(f.moneda!=='Pesos'?fU(f.importe):'—')+'</td>';
+        h+='<td></td><td></td><td></td>';
+        h+='<td class="num pos" style="text-align:right">'+fx(fImp)+'</td>';
         h+='<td></td><td></td>';
         h+='</tr>';
       });
@@ -1353,10 +1338,17 @@ function renderHist(){
     if(fr==='neg'&&o.ganARS>=0)return false;
     return true;
   });
-  var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th><th>Op.</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>F.compra</th><th>F.cierre</th><th>Días</th><th>Cant.</th><th>Costo ARS</th><th>Ingreso ARS</th><th>Flujos ARS</th><th>TC</th><th>Res.ARS</th><th>Res.USD</th><th>Rent.%</th><th>TNA</th></tr></thead><tbody>';
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var tcHoyVal=tcHoy();
+  var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th><th>Op.</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>F.compra</th><th>F.cierre</th><th>Días</th><th>Cant.</th><th>Costo</th><th>Ingreso</th><th>Flujos</th><th>Res.</th><th>Rent.%</th><th>TNA</th></tr></thead><tbody>';
   ops.sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
     var lbl=o.esVcto?'<span class="pill pv">Vcto.</span>':'<span class="pill psel">Venta</span>'+(o.tieneFX?'<span class="pill" style="font-size:9px;margin-left:2px;background:rgba(127,119,221,.12);color:#b0a9f5">FX</span>':'')+(o.flujosARS>0?'<span class="pill prt" style="font-size:9px;margin-left:2px">+CC</span>':'');
-    h+='<tr><td><strong>'+o.ticker+'</strong></td><td><span class="'+pc(o.tipo)+'">'+o.tipo+'</span></td><td>'+lbl+'</td>'+(d.isCon?'<td><span class="pill pcl">'+((o._cl||'').split(' ')[0])+'</span></td>':'')+'<td class="num dim">'+o.fechaCompra+'</td><td class="num dim">'+o.fechaVenta+'</td><td class="num dim">'+o.diasTen+'</td><td class="num">'+o.cant.toLocaleString('es-AR')+'</td><td class="num">'+fP(o.costoARS)+'</td><td class="num">'+fP(o.ingresoARS)+'</td><td class="num '+(o.flujosARS>0?'pos':'dim')+'">'+(o.flujosARS>0?fP(o.flujosARS):'—')+'</td><td class="num dim">'+(o.tcUsado?'$'+Math.round(o.tcUsado).toLocaleString('es-AR'):'—')+'</td><td class="num '+cc(o.ganARS)+'" style="font-weight:600">'+fP(o.ganARS)+'</td><td class="num '+cc(o.ganUSD)+'" style="font-weight:600">'+fU(o.ganUSD)+'</td><td class="'+cc(o.rentPct)+'">'+fPct(o.rentPct)+'</td><td class="'+cc(o.tna)+'">'+fTNA(o.tna)+'</td></tr>';
+    var costoV=isU?o.costoARS/tcHoyVal:o.costoARS;
+    var ingresoV=isU?o.ingresoARS/tcHoyVal:o.ingresoARS;
+    var flujosV=isU?(o.flujosARS||0)/tcHoyVal:o.flujosARS;
+    var resV=isU?o.ganUSD:o.ganARS;
+    h+='<tr><td><strong>'+o.ticker+'</strong></td><td><span class="'+pc(o.tipo)+'">'+o.tipo+'</span></td><td>'+lbl+'</td>'+(d.isCon?'<td><span class="pill pcl">'+((o._cl||'').split(' ')[0])+'</span></td>':'')+'<td class="num dim">'+o.fechaCompra+'</td><td class="num dim">'+o.fechaVenta+'</td><td class="num dim">'+o.diasTen+'</td><td class="num">'+o.cant.toLocaleString('es-AR')+'</td><td class="num">'+fx(costoV)+'</td><td class="num">'+fx(ingresoV)+'</td><td class="num '+(o.flujosARS>0?'pos':'dim')+'">'+(o.flujosARS>0?fx(flujosV):'—')+'</td><td class="num '+cc(resV)+'" style="font-weight:600">'+fx(resV)+'</td><td class="'+cc(o.rentPct)+'">'+fPct(o.rentPct)+'</td><td class="'+cc(o.tna)+'">'+fTNA(o.tna)+'</td></tr>';
   });
   h+='</tbody></table></div>';g('hist-b').innerHTML=h;
 }
@@ -1366,14 +1358,17 @@ function renderFlujos(){
   var ft=g('f-ftk')?g('f-ftk').value:'';
   var ftype=g('f-ftp')?g('f-ftp').value:'';
   var fl=d.flujos.filter(function(f){return (!ft||f.ticker===ft)&&(ftype?f.tipo===ftype:f.tipo!=='Amortización');});
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
   var tARS=fl.reduce(function(s,f){return s+f.importeARS;},0);
-  var tUSD=fl.filter(function(f){return f.moneda!=='Pesos';}).reduce(function(s,f){return s+f.importe;},0);
-  sa('fl-ars',fP(tARS),'pos');sa('fl-usd',fU(tUSD),'pos');g('fl-cnt').textContent=fl.length;
+  var tUSD=fl.reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0);
+  sa('fl-tot',fx(isU?tUSD:tARS),'pos');g('fl-cnt').textContent=fl.length;
   if(!fl.length){g('flujos-b').innerHTML='<div class="empty"><p>Importá la Cuenta Corriente para ver los flujos</p></div>';return;}
-  var h='<div class="tw"><table><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Descripción</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>Importe</th><th>Moneda</th><th>TC</th><th>ARS</th></tr></thead><tbody>';
+  var h='<div class="tw"><table><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Descripción</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>Moneda orig.</th><th>Importe</th></tr></thead><tbody>';
   fl.sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f){
     var tp=f.tipo==='Amortización'?'<span class="pill pv">Amort.</span>':f.tipo==='Dividendo'?'<span class="pill pdv">Div.</span>':'<span class="pill prt">Renta</span>';
-    h+='<tr><td class="num dim">'+f.fecha+'</td><td><strong>'+f.ticker+'</strong></td><td>'+tp+'</td><td class="dim" style="font-size:11px">'+f.tipoRaw+'</td>'+(d.isCon?'<td><span class="pill pcl">'+((f._cl||'').split(' ')[0])+'</span></td>':'')+'<td class="num pos">'+(f.moneda!=='Pesos'?fU(f.importe):fP(f.importe))+'</td><td class="dim" style="font-size:10px">'+f.moneda+'</td><td class="num dim">'+(f.tcUsado?'$'+Math.round(f.tcUsado).toLocaleString('es-AR'):'—')+'</td><td class="num pos" style="font-weight:500">'+fP(f.importeARS)+'</td></tr>';
+    var imp=isU?toUSD(f.importe,f.moneda,f.fecha):f.importeARS;
+    h+='<tr><td class="num dim">'+f.fecha+'</td><td><strong>'+f.ticker+'</strong></td><td>'+tp+'</td><td class="dim" style="font-size:11px">'+f.tipoRaw+'</td>'+(d.isCon?'<td><span class="pill pcl">'+((f._cl||'').split(' ')[0])+'</span></td>':'')+'<td class="dim" style="font-size:10px">'+f.moneda+'</td><td class="num pos" style="font-weight:500">'+fx(imp)+'</td></tr>';
   });
   h+='</tbody></table></div>';g('flujos-b').innerHTML=h;
 }
@@ -1596,7 +1591,7 @@ function exportPDF(){
     orden.filter(function(t){return grupos[t];}).forEach(function(tipo){
       var items=grupos[tipo].sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);});
       h+='<div style="margin:14px 0 6px;font-size:10.5px;font-weight:800;color:'+NAVY+';text-transform:uppercase;letter-spacing:.04em">'+tipo+' · '+items.length+' posición'+(items.length!==1?'es':'')+'</div>';
-      h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Símbolo')+thd('Nominales','right')+thd('P.Actual','right')+thd('Cartera ARS','right')+thd('Inv.ARS','right')+thd('Rend.ARS','right')+thd('Rend.%','right')+thd('Cartera USD','right')+thd('Inv.USD','right')+'</tr></thead><tbody>';
+      h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Símbolo')+thd('Nominales','right')+thd('P.Actual','right')+thd('Cartera','right')+thd('Inv.','right')+thd('Rend.','right')+thd('Rend.%','right')+'</tr></thead><tbody>';
       items.forEach(function(p){
         var pr=d.precios[p.ticker];
         var prD=pr?precioDisplay(pr,p.tipo):null;
@@ -1604,10 +1599,12 @@ function exportPDF(){
         var invARS=p.costoTotalARS||0;var fl=p.flujosARS||0;
         var rendARS=cA!=null?cA+fl-invARS:null;
         var rendPct=invARS>0&&rendARS!=null?(rendARS/invARS)*100:null;
-        var cartUSD=cA!=null?cA/tcHoyVal:null;
-        var invUSD=invARS/tcHoyVal;
         var rc=rendARS!=null?(rendARS>=0?GREEN:RED):MUTED;
-        h+='<tr>'+tdd('<b>'+p.ticker+'</b>')+tdd(p.cantTotal.toLocaleString('es-AR'),'right','font-family:monospace')+tdd(prD!=null?fP(prD):'—','right','font-family:monospace')+tdd(cA!=null?fP(cA):'—','right','font-family:monospace;font-weight:700')+tdd(fP(invARS),'right','font-family:monospace')+tdd(rendARS!=null?fP(rendARS):'—','right','font-family:monospace;font-weight:700;color:'+rc)+tdd(rendPct!=null?fPct(rendPct):'—','right','font-weight:700;color:'+rc)+tdd(cartUSD!=null?fU(cartUSD):'—','right','font-family:monospace;color:'+MUTED)+tdd(fU(invUSD),'right','font-family:monospace;color:'+MUTED)+'</tr>';
+        var prV=ccy==='USD'&&prD!=null?prD/tcHoyVal:prD;
+        var cAV=ccy==='USD'&&cA!=null?cA/tcHoyVal:cA;
+        var invV=ccy==='USD'?invARS/tcHoyVal:invARS;
+        var rendV=ccy==='USD'&&rendARS!=null?rendARS/tcHoyVal:rendARS;
+        h+='<tr>'+tdd('<b>'+p.ticker+'</b>')+tdd(p.cantTotal.toLocaleString('es-AR'),'right','font-family:monospace')+tdd(prV!=null?fc(prV,prV):'—','right','font-family:monospace')+tdd(cAV!=null?fc(cAV,cAV):'—','right','font-family:monospace;font-weight:700')+tdd(fc(invV,invV),'right','font-family:monospace')+tdd(rendV!=null?fc(rendV,rendV):'—','right','font-family:monospace;font-weight:700;color:'+rc)+tdd(rendPct!=null?fPct(rendPct):'—','right','font-weight:700;color:'+rc)+'</tr>';
       });
       h+='</tbody></table>';
     });
@@ -1617,10 +1614,13 @@ function exportPDF(){
   function htmlOpsCerradas(){
     var h=pageHeader('Operaciones cerradas');
     if(!d.opsCerradas.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin operaciones cerradas.</div>';return h;}
-    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('F.Compra','right')+thd('F.Cierre','right')+thd('Días','right')+thd('Costo ARS','right')+thd('Ingreso ARS','right')+thd('Res.ARS','right')+thd('Rent.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('F.Compra','right')+thd('F.Cierre','right')+thd('Días','right')+thd('Costo','right')+thd('Ingreso','right')+thd('Res.','right')+thd('Rent.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
     d.opsCerradas.slice().sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
       var rc=o.ganARS>=0?GREEN:RED;
-      h+='<tr>'+tdd('<b>'+o.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+o.tipo+'</span>')+tdd(o.fechaCompra,'right','font-family:monospace;color:'+MUTED)+tdd(o.fechaVenta,'right','font-family:monospace;color:'+MUTED)+tdd(o.diasTen,'right','color:'+MUTED)+tdd(fP(o.costoARS),'right','font-family:monospace')+tdd(fP(o.ingresoARS),'right','font-family:monospace')+tdd(fP(o.ganARS),'right','font-family:monospace;font-weight:700;color:'+rc)+tdd(fPct(o.rentPct),'right','font-weight:700;color:'+rc)+tdd(fTNA(o.tna),'right','color:'+rc)+'</tr>';
+      var costoV=ccy==='USD'?o.costoARS/tcHoyVal:o.costoARS;
+      var ingresoV=ccy==='USD'?o.ingresoARS/tcHoyVal:o.ingresoARS;
+      var resV=ccy==='USD'?o.ganUSD:o.ganARS;
+      h+='<tr>'+tdd('<b>'+o.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+o.tipo+'</span>')+tdd(o.fechaCompra,'right','font-family:monospace;color:'+MUTED)+tdd(o.fechaVenta,'right','font-family:monospace;color:'+MUTED)+tdd(o.diasTen,'right','color:'+MUTED)+tdd(fc(costoV,costoV),'right','font-family:monospace')+tdd(fc(ingresoV,ingresoV),'right','font-family:monospace')+tdd(fc(resV,resV),'right','font-family:monospace;font-weight:700;color:'+rc)+tdd(fPct(o.rentPct),'right','font-weight:700;color:'+rc)+tdd(fTNA(o.tna),'right','color:'+rc)+'</tr>';
     });
     h+='</tbody></table>';
     return h;
@@ -1631,16 +1631,18 @@ function exportPDF(){
     var flujosR=d.flujos.filter(function(f){return f.tipo!=='Amortización';});
     if(!flujosR.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin flujos de cuenta corriente importados.</div>';return h;}
     var totFl=flujosR.reduce(function(s,f){return s+f.importeARS;},0);
-    var porTipo={};flujosR.forEach(function(f){porTipo[f.tipo]=(porTipo[f.tipo]||0)+f.importeARS;});
+    var totFlUSD=flujosR.reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0);
+    var porTipo={};flujosR.forEach(function(f){porTipo[f.tipo]=(porTipo[f.tipo]||0)+(ccy==='USD'?toUSD(f.importe,f.moneda,f.fecha):f.importeARS);});
     var tiposK=Object.keys(porTipo);
     h+='<div style="display:grid;grid-template-columns:repeat('+(tiposK.length+1)+',1fr);gap:10px;margin-bottom:8px">';
-    h+=kpiCard('Total cobrado',fP(totFl),GREEN);
-    tiposK.forEach(function(t){h+=kpiCard(t,fP(porTipo[t]));});
+    h+=kpiCard('Total cobrado',fc(totFl,totFlUSD),GREEN);
+    tiposK.forEach(function(t){h+=kpiCard(t,fc(porTipo[t],porTipo[t]));});
     h+='</div>';
     h+=sTitle('Detalle de cobros');
-    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Fecha')+thd('Ticker')+thd('Tipo')+thd('Importe','right')+thd('Moneda')+thd('ARS','right')+'</tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Fecha')+thd('Ticker')+thd('Tipo')+thd('Moneda orig.')+thd('Importe','right')+'</tr></thead><tbody>';
     flujosR.slice().sort(function(a,b){return b.fecha.localeCompare(a.fecha);}).forEach(function(f){
-      h+='<tr>'+tdd(f.fecha,'left','font-family:monospace;color:'+MUTED)+tdd('<b>'+f.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+f.tipo+'</span>')+tdd(f.moneda!=='Pesos'?fU(f.importe):fP(f.importe),'right','font-family:monospace')+tdd('<span style="color:'+MUTED+';font-size:10px">'+f.moneda+'</span>')+tdd(fP(f.importeARS),'right','font-family:monospace;font-weight:700;color:'+GREEN)+'</tr>';
+      var imp=ccy==='USD'?toUSD(f.importe,f.moneda,f.fecha):f.importeARS;
+      h+='<tr>'+tdd(f.fecha,'left','font-family:monospace;color:'+MUTED)+tdd('<b>'+f.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+f.tipo+'</span>')+tdd('<span style="color:'+MUTED+';font-size:10px">'+f.moneda+'</span>')+tdd(fc(imp,imp),'right','font-family:monospace;font-weight:700;color:'+GREEN)+'</tr>';
     });
     h+='</tbody></table>';
     return h;
