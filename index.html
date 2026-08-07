@@ -801,6 +801,21 @@ function handleCC(e){
   };
   r.readAsArrayBuffer(f);
 }
+function parseNumES(raw){
+  if(raw==null)return 0;
+  var s=raw.toString().trim();
+  var neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1).trim();}
+  if(s.charAt(0)==='-'){neg=true;s=s.slice(1);}
+  s=s.replace(/\s/g,'');
+  if(s.indexOf(',')!==-1){
+    s=s.replace(/\./g,'').replace(',','.');
+  }else if(/^\d{1,3}(\.\d{3})+$/.test(s)){
+    s=s.replace(/\./g,'');
+  }
+  var n=parseFloat(s)||0;
+  return neg?-n:n;
+}
 function parseCC(data){
   if(!activeId||!clients[activeId])return;
   var c=clients[activeId];c.flujos=[];c.depositos=[];
@@ -809,18 +824,19 @@ function parseCC(data){
     var desc=(row['Descripcion']||row['Descripción']||'').toString().trim();
     var fecha=(row['Fecha']||'').toString().substring(0,10);
     var moneda=(row['Moneda']||row['moneda']||'Pesos').toString().trim();
-    var importe=parseFloat((row['Importe']||'0').toString().replace(',','.'))||0;
+    var importe=parseNumES(row['Importe']);
     if(!desc||!fecha||importe===0)return;
     var partes=desc.split('/').map(function(p){return p.trim();});
     var tipoRaw=partes[0].trim();
     // Movimientos de capital real: dinero que entra/sale de la cuenta desde/hacia afuera del broker
     // (a diferencia de Renta/Dividendo/Amortización, que son retorno de inversiones ya hechas)
-    if(tipoRaw==='Recibo de Cobro'){
+    if(tipoRaw==='Recibo de Cobro'||tipoRaw==='Comprobante de Pago'){
       var monedaDep=moneda;
       if(monedaDep==='Dólares C.V. 7000'||monedaDep==='Dólares C.V.'||monedaDep==='Dólares C.V')monedaDep='Dólares';
       else if(monedaDep==='Dólares'||monedaDep==='USD')monedaDep='Dólares';
       else monedaDep='Pesos';
-      c.depositos.push({fecha:fecha,monto:Math.abs(importe),moneda:monedaDep,signo:importe>0?1:-1});
+      var signo=tipoRaw==='Comprobante de Pago'?-1:(importe>0?1:-1);
+      c.depositos.push({fecha:fecha,monto:Math.abs(importe),moneda:monedaDep,signo:signo});
       return;
     }
     if(importe<=0)return;
@@ -854,7 +870,11 @@ function parseCC(data){
     Object.entries(byT).forEach(function(e){sh+='<div class="ccs"><div class="ccsl">'+e[0]+'</div><div class="ccsv" style="color:var(--pos)">'+fP(e[1])+'</div></div>';});
     b.innerHTML=sh;
   }
-  var depTxt=c.depositos.length?(' · '+c.depositos.length+' depósitos de capital'):'';
+  var nDep=c.depositos.filter(function(dp){return dp.signo>0;}).length;
+  var nRet=c.depositos.filter(function(dp){return dp.signo<0;}).length;
+  var depTxt='';
+  if(nDep)depTxt+=' · '+nDep+' depósito'+(nDep!==1?'s':'');
+  if(nRet)depTxt+=' · '+nRet+' retiro'+(nRet!==1?'s':'');
   g('msg-cc').innerHTML='<div class="al al-ok">✓ <strong>'+c.flujos.length+' flujos</strong> · '+c.flujos.filter(function(f){return f.tipo==='Amortización';}).length+' amort. · '+c.flujos.filter(function(f){return f.tipo==='Renta';}).length+' rentas · '+c.flujos.filter(function(f){return f.tipo==='Dividendo';}).length+' dividendos'+depTxt+'</div>';
   scheduleSave();
 }
