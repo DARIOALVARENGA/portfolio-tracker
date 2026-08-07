@@ -521,8 +521,8 @@ function getTCd(f){
 function tcFB(){return parseFloat(g('tc-mep').value)||1429.69;}
 function tcCable(){return parseFloat(g('tc-cable').value)||1478.19;}
 function tcHoy(){var fs=Object.keys(tcH).sort();return fs.length?tcH[fs[fs.length-1]]:tcFB();}
-function toARS(v,m,f){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*getTCd(f);}
-function toUSD(v,m,f){if(m==='Pesos')return v/getTCd(f);if(m==='US Dollar (Cable)')return v/tcCable();return v;}
+function toARS(v,m,f){if(m==='Pesos')return v;return v*getTCd(f);}
+function toUSD(v,m,f){if(m==='Pesos')return v/getTCd(f);return v;}
 function toARSn(v,m){if(m==='Pesos')return v;if(m==='US Dollar (Cable)')return v*tcCable();return v*tcHoy();}
 function isUSD(m){return m==='Dólares'||m==='US Dollar (Cable)'||m==='Dólares C.V. 7000';}
 
