@@ -354,6 +354,19 @@ input[type=file]{display:none}
           </div>
         </div>
         <div class="card">
+          <div class="ch"><span class="ct">4 · Split de acciones</span></div>
+          <div class="cb">
+            <div id="noc4" class="al al-err" style="display:none">Creá o seleccioná un cliente primero.</div>
+            <p style="font-size:11px;color:var(--t3);margin-bottom:9px">Ajusta cantidad y precio de todos los boletos de un ticker por un split (ej. YPF 10 a 1 → factor 10) o split inverso (ej. factor 0.5 para 2 a 1). El costo en $ no cambia.</p>
+            <div class="tc-r">
+              <div class="tcg"><label>Ticker</label><input type="text" id="split-tk" placeholder="Ej: YPFD" style="text-transform:uppercase"></div>
+              <div class="tcg"><label>Factor</label><input type="number" id="split-fx" placeholder="Ej: 10" step="any"></div>
+              <button class="btn" onclick="aplicarSplit()" style="margin-top:auto">Aplicar</button>
+            </div>
+            <div id="msg-split"></div>
+          </div>
+        </div>
+        <div class="card">
           <div class="ch"><span class="ct">TC fallback</span></div>
           <div class="cb">
             <div class="tc-r">
@@ -660,13 +673,13 @@ function updateTag(){
   else t.style.display='none';
 }
 function updateCfg(){
-  var cn=g('cfg-cn'),w1=g('noc1'),w2=g('noc2'),w3=g('noc3');
+  var cn=g('cfg-cn'),w1=g('noc1'),w2=g('noc2'),w3=g('noc3'),w4=g('noc4');
   if(activeId&&clients[activeId]){
     cn.textContent=clients[activeId].name;
-    if(w1)w1.style.display='none';if(w2)w2.style.display='none';if(w3)w3.style.display='none';
+    if(w1)w1.style.display='none';if(w2)w2.style.display='none';if(w3)w3.style.display='none';if(w4)w4.style.display='none';
   }else{
     cn.textContent='—';
-    if(w1)w1.style.display='flex';if(w2)w2.style.display='flex';if(w3)w3.style.display='flex';
+    if(w1)w1.style.display='flex';if(w2)w2.style.display='flex';if(w3)w3.style.display='flex';if(w4)w4.style.display='flex';
   }
 }
 function renderCL(){
@@ -919,6 +932,24 @@ function parseHO(data){
   });
   calcC(c);renderCL();renderAll();renderPG();
   g('msg-ho').innerHTML='<div class="al al-ok">✓ <strong>'+cnt+' órdenes de fondos</strong> importadas.</div>';
+  scheduleSave();
+}
+
+// ═══ SPLIT DE ACCIONES ═══
+function aplicarSplit(){
+  if(!activeId||!clients[activeId]){g('msg-split').innerHTML='<div class="al al-err">Seleccioná un cliente primero.</div>';return;}
+  var tk=(g('split-tk').value||'').trim().toUpperCase();
+  var fx=parseFloat(g('split-fx').value);
+  if(!tk){g('msg-split').innerHTML='<div class="al al-err">Ingresá un ticker.</div>';return;}
+  if(!fx||fx<=0){g('msg-split').innerHTML='<div class="al al-err">Ingresá un factor válido (ej. 10 para un split 10 a 1, 0.5 para un split inverso 2 a 1).</div>';return;}
+  var c=clients[activeId];
+  var afectados=c.boletos.filter(function(b){return b.ticker===tk;});
+  if(!afectados.length){g('msg-split').innerHTML='<div class="al al-err">No hay boletos de "'+tk+'" para este cliente.</div>';return;}
+  if(!confirm('¿Aplicar split de factor '+fx+' a '+afectados.length+' boleto'+(afectados.length!==1?'s':'')+' de '+tk+'?\n\nSe multiplica la cantidad y se divide el precio por ese factor (el costo en $ no cambia). No se puede deshacer automáticamente.'))return;
+  afectados.forEach(function(b){b.cant=b.cant*fx;b.precio=b.precio/fx;});
+  calcC(c);renderCL();renderAll();renderPG();
+  g('msg-split').innerHTML='<div class="al al-ok">✓ Split aplicado a <strong>'+afectados.length+' boleto'+(afectados.length!==1?'s':'')+'</strong> de '+tk+'.</div>';
+  g('split-tk').value='';g('split-fx').value='';
   scheduleSave();
 }
 
