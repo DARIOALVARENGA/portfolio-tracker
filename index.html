@@ -789,8 +789,8 @@ function parseBol(data){
       var ticker2=tickerRaw;
       if(TICKER_EQUIV[tickerRaw]){var eq2=TICKER_EQUIV[tickerRaw];cant2=cant2/eq2.ratio;ticker2=eq2.base;}
       var tipo2=tipoRaw;
-      if(['COMPRAEXT','LICITACIÓN MAE','LICITACION MAE'].includes(tipoRaw))tipo2='COMPRA';
-      else if(tipoRaw==='CSBNG')tipo2='VENTA';
+      if(['COMPRAEXT','LICITACIÓN MAE','LICITACION MAE','CSBNG'].includes(tipoRaw))tipo2='COMPRA';
+      else if(tipoRaw==='VSBNG')tipo2='VENTA';
       else if(tipoRaw!=='COMPRA'&&tipoRaw!=='VENTA')return;
       c.boletos.push({num:num,tipo:tipo2,ticker:ticker2,desc:desc||ticker2,cant:cant2,precio:precio2,neto:neto,moneda:moneda2,conc:conc2,liq:liq,ta:getTipo(ticker2,desc)});
     }
