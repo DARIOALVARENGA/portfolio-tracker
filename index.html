@@ -1325,7 +1325,7 @@ function exportPDF(){
   var orden=['Acción','CEDEAR','Bono','ON','Letra','Fondo','Otro'];
 
   // Paleta ejecutiva: fondo blanco, navy institucional, acento dorado sutil, color sólo en +/-
-  var NAVY='#0B2545',NAVY2='#173963',GOLD='#a5762f',MUTED='#6b7785',BORDER='#e3e7eb',ROWALT='#f6f8fa',GREEN='#1a7d4a',RED='#b23a2e',TEXT='#1c2b3a';
+  var NAVY='#0B2545',NAVY2='#173963',GOLD='#a5762f',MUTED='#4b5563',BORDER='#e3e7eb',ROWALT='#f6f8fa',GREEN='#1a7d4a',RED='#b23a2e',TEXT='#1c2b3a';
   var donutColores=['#0B2545','#3d6ea5','#8fadc9','#c9922a','#7a8fa3','#b7c4cf'];
 
   function pageHeader(titulo){
@@ -1509,21 +1509,33 @@ function exportPDF(){
 
   var secciones=[htmlDashboard,htmlPosiciones,htmlOpsCerradas,htmlFlujos];
   var total=secciones.length;
+  var htmls=secciones.map(function(fn,i){return fn()+pageFooter(i+1,total);});
+
+  // Pasada de medición: calculamos el alto de cada página y usamos el máximo para todas,
+  // así el PDF queda con el mismo tamaño de hoja en todas las páginas.
+  var fullW=1168,maxH=0;
+  htmls.forEach(function(bodyHtml){
+    var m=document.createElement('div');
+    m.style.cssText='position:absolute;left:-9999px;top:0;width:1100px;box-sizing:border-box;background:#ffffff;color:'+TEXT+';font-family:sans-serif;font-size:12px;padding:34px;';
+    m.innerHTML=bodyHtml;
+    document.body.appendChild(m);
+    if(m.scrollHeight>maxH)maxH=m.scrollHeight;
+    document.body.removeChild(m);
+  });
+
   var pdf=null,idx=0;
 
   function renderPagina(){
-    if(idx>=secciones.length){
+    if(idx>=htmls.length){
       pdf.save('reporte_'+label.replace(/\s+/g,'_').toLowerCase()+'_'+new Date().toISOString().substring(0,10)+'.pdf');
       return;
     }
     var n=idx+1;
-    var bodyHtml=secciones[idx]()+pageFooter(n,total);
     var wrap=document.createElement('div');
-    wrap.style.cssText='position:absolute;left:-9999px;top:0;width:1100px;background:#ffffff;color:'+TEXT+';font-family:sans-serif;font-size:12px;padding:34px;';
-    wrap.innerHTML=bodyHtml;
+    wrap.style.cssText='position:absolute;left:-9999px;top:0;width:1100px;height:'+maxH+'px;box-sizing:border-box;background:#ffffff;color:'+TEXT+';font-family:sans-serif;font-size:12px;padding:34px;';
+    wrap.innerHTML=htmls[idx];
     document.body.appendChild(wrap);
-    var fullH=wrap.scrollHeight,fullW=wrap.scrollWidth;
-    html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,width:fullW,height:fullH,windowWidth:fullW,windowHeight:fullH}).then(function(canvas){
+    html2canvas(wrap,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,width:fullW,height:maxH,windowWidth:fullW,windowHeight:maxH}).then(function(canvas){
       document.body.removeChild(wrap);
       var imgData=canvas.toDataURL('image/png');
       var pw=canvas.width/2,ph=canvas.height/2;
