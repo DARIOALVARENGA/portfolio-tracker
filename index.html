@@ -834,7 +834,7 @@ function parseNumES(raw){
 }
 function parseCC(data){
   if(!activeId||!clients[activeId])return;
-  var c=clients[activeId];c.flujos=[];c.depositos=[];
+  var c=clients[activeId];c.flujos=[];c.depositos=(c.depositos||[]).filter(function(dp){return dp.origen==='HO';});
   var esFmtModerno=data.length>0&&('Descripcion' in data[0]||'Descripción' in data[0])&&'Importe' in data[0]&&!('Tipo' in data[0]);
   data.forEach(function(row){
     var desc=(row['Descripcion']||row['Descripción']||'').toString().trim();
@@ -910,7 +910,9 @@ function parseHO(data){
   if(!activeId||!clients[activeId])return;
   var c=clients[activeId];
   c.boletos=c.boletos.filter(function(b){return b.ta!=='Fondo';});
-  var cnt=0;
+  if(!c.depositos)c.depositos=[];
+  c.depositos=c.depositos.filter(function(dp){return dp.origen!=='HO';});
+  var cnt=0,cntDep=0;
   data.forEach(function(row){
     var estado=(row['Estado']||'').toString().trim();
     if(estado!=='Ejecutada')return;
@@ -922,19 +924,25 @@ function parseHO(data){
     var ticker=(row['Ticker']||'').toString().trim();
     if(!ticker)return;
     if(TMAP[ticker]!=='Fondo')return; // esta sección es solo para Fondos; otros tickers vienen por Boletos/IOL y no deben duplicarse acá
-    var cantOp=parseFloat((row['Cantidad Operada']||row['Cantidad']||'0').toString().replace(',','.'))||0;
-    var precioOp=parseFloat((row['Precio Operado']||row['Precio']||'0').toString().replace(',','.'))||0;
+    var cantOp=parseNumES(row['Cantidad Operada']||row['Cantidad']);
+    var montoOp=parseNumES(row['Monto']);
+    var precioOp=cantOp>0?Math.abs(montoOp)/cantOp:parseNumES(row['Precio Operado']||row['Precio']);
     if(cantOp<=0||cantOp===-1)return;
     var moneda=(row['Moneda']||'Pesos').toString().trim();
     var fechaRaw=(row['Fecha']||'').toString().trim();
     var conc='';
     if(fechaRaw.includes('/')){var p=fechaRaw.split('/');conc=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
     else conc=fechaRaw.substring(0,10);
-    c.boletos.push({num:row['Orden']||'',tipo:tipo,ticker:ticker,desc:ticker,cant:cantOp,precio:precioOp,neto:cantOp*precioOp,moneda:moneda,conc:conc,liq:conc,ta:'Fondo'});
+    c.boletos.push({num:row['Orden']||'',tipo:tipo,ticker:ticker,desc:ticker,cant:cantOp,precio:precioOp,neto:Math.abs(montoOp)||cantOp*precioOp,moneda:moneda,conc:conc,liq:conc,ta:'Fondo'});
     cnt++;
+    // "Suscripción Desde Banco": capital real que el cliente transfirió desde su banco directo a un fondo
+    if(opRaw==='Suscripción Desde Banco'||opRaw==='Suscripcion Desde Banco'){
+      c.depositos.push({fecha:conc,monto:Math.abs(montoOp)||cantOp*precioOp,moneda:moneda,signo:1,origen:'HO'});
+      cntDep++;
+    }
   });
   calcC(c);renderCL();renderAll();renderPG();
-  g('msg-ho').innerHTML='<div class="al al-ok">✓ <strong>'+cnt+' órdenes de fondos</strong> importadas.</div>';
+  g('msg-ho').innerHTML='<div class="al al-ok">✓ <strong>'+cnt+' órdenes de fondos</strong> importadas'+(cntDep?' · '+cntDep+' depósito'+(cntDep!==1?'s':'')+' desde banco':'')+'.</div>';
   scheduleSave();
 }
 
