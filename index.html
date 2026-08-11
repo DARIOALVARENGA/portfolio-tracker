@@ -1045,6 +1045,17 @@ function calcC(c){
         if(cola[i].moneda!==v.moneda)tieneFX=true;
         cola[i].cr-=m;cv-=m;
       }
+      var esFondo=(pos?pos.tipo:getTipo(ticker,''))==='Fondo';
+      var sinDatoCosto=false;
+      if(cv>0&&esFondo){
+        // No hay compra registrada para matchear esta porción (ej. suscripciones automáticas no reportadas).
+        // Para un Fondo money-market, asumimos costo≈ingreso (resultado ~0) en vez de costo $0 (que infla la ganancia artificialmente).
+        var nuV=v.neto/v.cant;
+        costoARS+=toARS(cv*nuV,v.moneda,v.conc);
+        costoUSD+=toUSD(cv*nuV,v.moneda,v.conc);
+        sinDatoCosto=true;
+        cv=0;
+      }
       var ingresoARS=toARS(v.neto,v.moneda,v.conc);
       var ingresoUSD=toUSD(v.neto,v.moneda,v.conc);
       var tcV=getTCd(v.conc);
@@ -1054,7 +1065,7 @@ function calcC(c){
       var ganUSD=(ingresoUSD+flujosOpUSD)-costoUSD;
       var rentPct=costoARS>0?(ganARS/costoARS)*100:0;
       var cr=compras[0];var dt=cr?dds(cr.conc,v.conc):1;
-      c.opsCerradas.push({ticker:ticker,desc:pos?pos.desc:ticker,tipo:pos?pos.tipo:getTipo(ticker,''),moneda:v.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:v.conc,cant:v.cant,costoARS:costoARS,costoUSD:costoUSD,ingresoARS:ingresoARS,ingresoUSD:ingresoUSD,flujosARS:flujosOp,flujosUSD:flujosOpUSD,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:false,tieneFX:tieneFX,tcUsado:tcV});
+      c.opsCerradas.push({ticker:ticker,desc:pos?pos.desc:ticker,tipo:pos?pos.tipo:getTipo(ticker,''),moneda:v.moneda,fechaCompra:cr?cr.conc:'—',fechaVenta:v.conc,cant:v.cant,costoARS:costoARS,costoUSD:costoUSD,ingresoARS:ingresoARS,ingresoUSD:ingresoUSD,flujosARS:flujosOp,flujosUSD:flujosOpUSD,ganARS:ganARS,ganUSD:ganUSD,rentPct:rentPct,tna:dt>0?(rentPct/dt)*365:0,diasTen:dt,esVcto:false,tieneFX:tieneFX,tcUsado:tcV,sinDatoCosto:sinDatoCosto});
     });
   });
 }
@@ -1427,7 +1438,7 @@ function renderHist(){
   var tcHoyVal=tcHoy();
   var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th><th>Op.</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>F.compra</th><th>F.cierre</th><th>Días</th><th>Cant.</th><th>Costo</th><th>Ingreso</th><th>Flujos</th><th>Res.</th><th>Rent.%</th><th>TNA</th></tr></thead><tbody>';
   ops.sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
-    var lbl=o.esVcto?'<span class="pill pv">Vcto.</span>':'<span class="pill psel">Venta</span>'+(o.tieneFX?'<span class="pill" style="font-size:9px;margin-left:2px;background:rgba(127,119,221,.12);color:#b0a9f5">FX</span>':'')+(o.flujosARS>0?'<span class="pill prt" style="font-size:9px;margin-left:2px">+CC</span>':'');
+    var lbl=o.esVcto?'<span class="pill pv">Vcto.</span>':'<span class="pill psel">Venta</span>'+(o.tieneFX?'<span class="pill" style="font-size:9px;margin-left:2px;background:rgba(127,119,221,.12);color:#b0a9f5">FX</span>':'')+(o.flujosARS>0?'<span class="pill prt" style="font-size:9px;margin-left:2px">+CC</span>':'')+(o.sinDatoCosto?'<span class="pill" style="font-size:9px;margin-left:2px;background:rgba(233,196,106,.15);color:#e9c46a" title="No se encontró compra para matchear; se asumió costo≈ingreso">Aprox.</span>':'');
     var costoV=isU?o.costoUSD:o.costoARS;
     var ingresoV=isU?o.ingresoUSD:o.ingresoARS;
     var flujosV=isU?(o.flujosUSD||0):o.flujosARS;
