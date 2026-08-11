@@ -1576,6 +1576,19 @@ function exportPDF(){
       +'<div style="width:58px;text-align:right;font-weight:700;color:'+color+'">'+fPct(pct)+'</div>'
       +'</div>';
   }
+  function barActivo(lbl,val,maxAbs,valTxt,bold){
+    var w=maxAbs>0?Math.min(50,Math.abs(val)/maxAbs*50):0;
+    var color=val>=0?GREEN:RED;
+    var side=val>=0?'left':'right';
+    return '<div style="display:flex;align-items:center;margin-bottom:8px;font-size:'+(bold?'11.5px':'10.5px')+'">'
+      +'<div style="width:64px;font-weight:'+(bold?'800':'700')+';color:'+NAVY+'">'+lbl+'</div>'
+      +'<div style="flex:1;position:relative;height:13px;background:'+ROWALT+';border:1px solid '+BORDER+';border-radius:2px">'
+      +'<div style="position:absolute;left:50%;top:-1px;width:1px;height:15px;background:'+BORDER2()+'"></div>'
+      +'<div style="position:absolute;'+side+':50%;top:1px;height:11px;width:'+w+'%;background:'+color+';border-radius:1px"></div>'
+      +'</div>'
+      +'<div style="width:100px;text-align:right;font-weight:'+(bold?'800':'700')+';color:'+color+'">'+valTxt+'</div>'
+      +'</div>';
+  }
   function BORDER2(){return '#c7cdd3';}
 
   function htmlDashboard(){
@@ -1698,6 +1711,20 @@ function exportPDF(){
   function htmlOpsCerradas(){
     var h=pageHeader('Operaciones cerradas');
     if(!d.opsCerradas.length){h+='<div style="color:'+MUTED+';padding:10px 0">Sin operaciones cerradas.</div>';return h;}
+
+    var byT={};
+    d.opsCerradas.forEach(function(o){
+      if(!byT[o.ticker])byT[o.ticker]={ticker:o.ticker,gan:0};
+      byT[o.ticker].gan+=ccy==='USD'?o.ganUSD:o.ganARS;
+    });
+    var items=Object.values(byT).sort(function(a,b){return b.gan-a.gan;});
+    var totalGan=items.reduce(function(s,x){return s+x.gan;},0);
+    var maxAbs=items.reduce(function(m,x){return Math.max(m,Math.abs(x.gan));},1);
+    h+=sTitle('Resultado por activo');
+    items.forEach(function(x){h+=barActivo(x.ticker,x.gan,maxAbs,fc(x.gan,x.gan));});
+    h+='<div style="margin-top:4px;padding-top:8px;border-top:1.5px solid '+NAVY+'">'+barActivo('TOTAL',totalGan,maxAbs,fc(totalGan,totalGan),true)+'</div>';
+
+    h+=sTitle('Detalle de operaciones');
     h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('F.Compra','right')+thd('F.Cierre','right')+thd('Días','right')+thd('Costo','right')+thd('Ingreso','right')+thd('Res.','right')+thd('Rent.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
     d.opsCerradas.slice().sort(function(a,b){return b.fechaVenta.localeCompare(a.fechaVenta);}).forEach(function(o){
       var rc=o.ganARS>=0?GREEN:RED;
