@@ -1131,7 +1131,10 @@ function renderTop(d){
 function renderRes(d){
   var pos=Object.values(d.posiciones).filter(function(p){return p.cantTotal>0;});
   if(!pos.length){g('res-b').innerHTML='<div class="empty"><p>Sin posiciones abiertas</p></div>';return;}
-  var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>Nominales</th><th>Costo ARS</th><th>Cartera ARS</th><th>Rend. ARS</th><th>Rend.%</th><th>TNA</th></tr></thead><tbody>';
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var tcHoyVal=tcHoy();
+  var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>Nominales</th><th>Costo</th><th>Cartera</th><th>Rend.</th><th>Rend.%</th><th>TNA</th></tr></thead><tbody>';
   pos.sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);}).forEach(function(p){
     var pr=d.precios[p.ticker];
     var va=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):null;
@@ -1141,7 +1144,10 @@ function renderRes(d){
     var t_=p.diasProm>0&&r!=null?(r/p.diasProm)*365:null;
     var cn='';
     if(d.isCon){var f=Object.values(clients).find(function(c){return c.posiciones&&c.posiciones[p.ticker]&&c.posiciones[p.ticker].cantTotal>0;});cn=f?f.name.split(' ')[0]:'';}
-    h+='<tr><td><strong>'+p.ticker+'</strong></td><td><span class="'+pc(p.tipo)+'">'+p.tipo+'</span></td>'+(d.isCon?'<td><span class="pill pcl">'+cn+'</span></td>':'')+'<td class="num">'+p.cantTotal.toLocaleString('es-AR')+'</td><td class="num">'+fP(cA)+'</td><td class="num">'+(va!=null?fP(va):'—')+'</td><td class="num '+(gan!=null?cc(gan):'')+'">'+(gan!=null?fP(gan):'—')+'</td><td class="'+(r!=null?cc(r):'')+'">'+(r!=null?fPct(r):'—')+'</td><td class="'+(t_!=null?cc(t_):'')+'">'+(t_!=null?fTNA(t_):'—')+'</td></tr>';
+    var cAV=isU?cA/tcHoyVal:cA;
+    var vaV=isU&&va!=null?va/tcHoyVal:va;
+    var ganV=isU&&gan!=null?gan/tcHoyVal:gan;
+    h+='<tr><td><strong>'+p.ticker+'</strong></td><td><span class="'+pc(p.tipo)+'">'+p.tipo+'</span></td>'+(d.isCon?'<td><span class="pill pcl">'+cn+'</span></td>':'')+'<td class="num">'+p.cantTotal.toLocaleString('es-AR')+'</td><td class="num">'+fx(cAV)+'</td><td class="num">'+(vaV!=null?fx(vaV):'—')+'</td><td class="num '+(ganV!=null?cc(ganV):'')+'">'+(ganV!=null?fx(ganV):'—')+'</td><td class="'+(r!=null?cc(r):'')+'">'+(r!=null?fPct(r):'—')+'</td><td class="'+(t_!=null?cc(t_):'')+'">'+(t_!=null?fTNA(t_):'—')+'</td></tr>';
   });
   h+='</tbody></table></div>';g('res-b').innerHTML=h;
 }
@@ -1246,8 +1252,9 @@ function renderPos(){
   var tcHoyVal=tcHoy();
   var isU=viewCcy==='USD';
   var fx=isU?fU:fP;
-  var NC=d.isCon?10:9;
-  var h='<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual</th><th style="text-align:right">Cartera</th><th style="text-align:right">Inv.</th><th style="text-align:right">Rend.</th><th style="text-align:right">TNA</th></tr></thead><tbody>';
+  var NC=d.isCon?11:10;
+  var h='<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual</th><th style="text-align:right">Cartera</th><th style="text-align:right">Inv.</th><th style="text-align:right">Rend.</th><th style="text-align:right">Rend.%</th><th style="text-align:right">TNA</th></tr></thead><tbody>';
+  var totCartARS=0,totInvARS=0,totRendARS=0,sumDiasPonderado=0;
   orden.filter(function(t){return grupos[t];}).forEach(function(tipo){
     var items=grupos[tipo].sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);});
     h+='<tr><td colspan="'+NC+'" style="background:var(--sf2);padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)"><span class="'+pc(tipo)+'" style="margin-right:6px">'+tipo+'</span>'+items.length+' posición'+(items.length!==1?'es':'')+'</td></tr>';
@@ -1272,6 +1279,10 @@ function renderPos(){
       var cartV=isU&&cartARS!=null?cartARS/tcHoyVal:cartARS;
       var invV=isU?invUSD:invARS;
       var rendV=isU&&rendARS!=null?rendARS/tcHoyVal:rendARS;
+      totCartARS+=cartARS!=null?cartARS:invARS;
+      totInvARS+=invARS;
+      totRendARS+=rendARS!=null?rendARS:0;
+      sumDiasPonderado+=dias*invARS;
       h+='<tr style="cursor:pointer;background:var(--bg3)" onclick="toggleRow(\''+rowId+'\')">';
       h+='<td style="text-align:center;font-size:11px;color:var(--gold)" id="ico-'+rowId+'">▶</td>';
       h+='<td><strong>'+p.ticker+'</strong>'+vtag+'</td>';
@@ -1282,6 +1293,7 @@ function renderPos(){
       h+='<td class="num" style="text-align:right;font-weight:600">'+(cartV!=null?fx(cartV):'<span class="dim">—</span>')+'</td>';
       h+='<td class="num" style="text-align:right">'+fx(invV)+'</td>';
       h+='<td class="num '+(rendV!=null?cc(rendV):'')+'" style="text-align:right;font-weight:600">'+(rendV!=null?fx(rendV):'—')+'</td>';
+      h+='<td class="'+(rendARSpct!=null?cc(rendARSpct):'')+'" style="text-align:right">'+(rendARSpct!=null?fPct(rendARSpct):'—')+'</td>';
       h+='<td class="'+(tnaARS!=null?cc(tnaARS):'')+'" style="text-align:right">'+(tnaARS!=null?fTNA(tnaARS):'—')+'</td>';
       h+='</tr>';
       h+='<tbody id="'+rowId+'" style="display:none">';
@@ -1308,6 +1320,7 @@ function renderPos(){
         h+='<td></td>';
         h+='<td class="num" style="text-align:right">'+fx(invXV)+'</td>';
         h+='<td class="num '+(rendXV!=null?cc(rendXV):'')+'" style="text-align:right">'+(rendXV!=null?fx(rendXV):'—')+'</td>';
+        h+='<td class="'+(rendXpct!=null?cc(rendXpct):'')+'" style="text-align:right">'+(rendXpct!=null?fPct(rendXpct):'—')+'</td>';
         h+='<td class="'+(tnaXARS!=null?cc(tnaXARS):'')+'" style="text-align:right">'+(tnaXARS!=null?fTNA(tnaXARS):'—')+'</td>';
         h+='</tr>';
       });
@@ -1319,13 +1332,29 @@ function renderPos(){
         if(d.isCon)h+='<td></td>';
         h+='<td></td><td></td><td></td>';
         h+='<td class="num pos" style="text-align:right">'+fx(fImp)+'</td>';
-        h+='<td></td><td></td>';
+        h+='<td></td><td></td><td></td>';
         h+='</tr>';
       });
       h+='</tbody>';
     });
   });
-  h+='</tbody></table></div>';
+  var totRendPct=totInvARS>0?(totRendARS/totInvARS)*100:null;
+  var diasPondTotal=totInvARS>0?sumDiasPonderado/totInvARS:0;
+  var totTNA=totRendPct!=null&&diasPondTotal>0?(totRendPct/diasPondTotal)*365:null;
+  var totCartV=isU?totCartARS/tcHoyVal:totCartARS;
+  var totInvV=isU?totInvARS/tcHoyVal:totInvARS;
+  var totRendV=isU?totRendARS/tcHoyVal:totRendARS;
+  h+='<tfoot><tr style="background:var(--sf2);font-weight:800;border-top:2px solid var(--bd2)">';
+  h+='<td></td><td>TOTAL</td>';
+  if(d.isCon)h+='<td></td>';
+  h+='<td></td><td></td><td></td>';
+  h+='<td class="num" style="text-align:right">'+fx(totCartV)+'</td>';
+  h+='<td class="num" style="text-align:right">'+fx(totInvV)+'</td>';
+  h+='<td class="num '+cc(totRendV)+'" style="text-align:right">'+fx(totRendV)+'</td>';
+  h+='<td class="'+(totRendPct!=null?cc(totRendPct):'')+'" style="text-align:right">'+(totRendPct!=null?fPct(totRendPct):'—')+'</td>';
+  h+='<td class="'+(totTNA!=null?cc(totTNA):'')+'" style="text-align:right">'+(totTNA!=null?fTNA(totTNA):'—')+'</td>';
+  h+='</tr></tfoot>';
+  h+='</table></div>';
   g('pos-b').innerHTML=h;
 }
 
