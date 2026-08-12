@@ -1650,16 +1650,6 @@ function exportPDF(){
 
   function htmlDashboard(){
     var h=pageHeader('Dashboard'+(ccy==='USD'?' (cifras en USD)':''));
-    var flujosKpi=(d.flujos||[]).filter(function(f){return f.tipo!=='Amortización';});
-    var flARS=flujosKpi.reduce(function(s,f){return s+f.importeARS;},0);
-    var flUSD=flujosKpi.reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0);
-    h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:8px">';
-    h+=kpiCard('Cartera total',fc(tARS,tUSD));
-    h+=kpiCard('Costo invertido',fc(cARS,cUSD));
-    h+=kpiCard('Result. no realizado',fc(gan,ganUSD)+' ('+fPct(rp)+')',gan>=0?GREEN:RED);
-    h+=kpiCard('Result. realizado',fc(rARS,rUSD),rARS>=0?GREEN:RED);
-    h+=kpiCard('Flujos cobrados',fc(flARS,flUSD),GREEN);
-    h+='</div>';
 
     var grupos={};pos.forEach(function(p){if(!grupos[p.tipo])grupos[p.tipo]=[];grupos[p.tipo].push(p);});
     h+=sTitle('Composición de cartera');
@@ -1715,6 +1705,29 @@ function exportPDF(){
           :'<b>Capital pico</b> (estimado): sin depósitos reales detectados, se reconstruye por compras/ventas/flujos. ')
         +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo que se vendió o cobró en el camino, esté o no reinvertido. La diferencia entre ambos es la ganancia total.'
         +'</div>';
+    }
+
+    if(pos.length){
+      h+=sTitle('Resumen posiciones');
+      h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+thd('Ticker')+thd('Tipo')+thd('Costo','right')+thd('Cartera','right')+thd('Rend.','right')+thd('Rend.%','right')+thd('TNA','right')+'</tr></thead><tbody>';
+      var totCA=0,totVa=0,totGan=0,sumDiasPond=0;
+      pos.slice().sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);}).forEach(function(p){
+        var pr=d.precios[p.ticker];
+        var va=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):null;
+        var fl=p.flujosARS||0,cA=p.costoTotalARS||0;
+        var gan_=va!=null?va+fl-cA:null;
+        var r=cA>0&&gan_!=null?(gan_/cA)*100:null;
+        var t_=p.diasProm>0&&r!=null?(r/p.diasProm)*365:null;
+        var rc=gan_!=null?(gan_>=0?GREEN:RED):MUTED;
+        totCA+=cA;totVa+=va!=null?va:cA;totGan+=gan_!=null?gan_:0;sumDiasPond+=(p.diasProm||0)*cA;
+        h+='<tr>'+tdd('<b>'+p.ticker+'</b>')+tdd('<span style="color:'+MUTED+'">'+p.tipo+'</span>')+tdd(fc(cA,cA/tcHoyVal),'right','font-family:monospace')+tdd(va!=null?fc(va,va/tcHoyVal):'—','right','font-family:monospace')+tdd(gan_!=null?fc(gan_,gan_/tcHoyVal):'—','right','font-family:monospace;font-weight:700;color:'+rc)+tdd(r!=null?fPct(r):'—','right','font-weight:700;color:'+rc)+tdd(t_!=null?fTNA(t_):'—','right','color:'+rc)+'</tr>';
+      });
+      var totR=totCA>0?(totGan/totCA)*100:null;
+      var diasPond=totCA>0?sumDiasPond/totCA:0;
+      var totTNA=totR!=null&&diasPond>0?(totR/diasPond)*365:null;
+      var rcT=totGan>=0?GREEN:RED;
+      h+='<tr style="background:'+ROWALT+';font-weight:800;border-top:2px solid '+NAVY+'">'+tdd('TOTAL')+tdd('')+tdd(fc(totCA,totCA/tcHoyVal),'right','font-family:monospace')+tdd(fc(totVa,totVa/tcHoyVal),'right','font-family:monospace')+tdd(fc(totGan,totGan/tcHoyVal),'right','font-family:monospace;color:'+rcT)+tdd(totR!=null?fPct(totR):'—','right','color:'+rcT)+tdd(totTNA!=null?fTNA(totTNA):'—','right','color:'+rcT)+'</tr>';
+      h+='</tbody></table>';
     }
     return h;
   }
@@ -1813,7 +1826,7 @@ function exportPDF(){
     return h;
   }
 
-  var secciones=[htmlDashboard,htmlPosiciones,htmlOpsCerradas,htmlFlujos];
+  var secciones=[htmlDashboard,htmlPosiciones];
   var total=secciones.length;
   var htmls=secciones.map(function(fn,i){return fn()+pageFooter(i+1,total);});
 
@@ -1857,7 +1870,7 @@ function exportPDF(){
       renderPagina();
     }).catch(function(err){
       document.body.removeChild(wrap);
-      alert('Error generando página '+n+' ('+(idx===0?'Dashboard':idx===1?'Posiciones':idx===2?'Op. cerradas':'Flujos')+'): '+err.message);
+      alert('Error generando página '+n+' ('+(idx===0?'Dashboard':'Posiciones')+'): '+err.message);
     });
   }
   renderPagina();
