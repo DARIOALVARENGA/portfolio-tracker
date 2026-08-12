@@ -1276,7 +1276,19 @@ function renderAnual(d){
       +'</div>';
   });
   h+='<div style="display:flex;font-size:10px;color:var(--t3);padding-top:4px;border-top:1px solid var(--bd)"><div style="width:48px"></div><div style="flex:1"></div><div style="width:90px;text-align:right">Nominal</div><div style="width:64px;text-align:right">Retorno</div><div style="width:64px;text-align:right">TNA</div></div>';
-  h+='<div style="font-size:10.5px;color:var(--t3);margin-top:10px;line-height:1.4">El año en curso queda <b>parcial</b>: solo suma resultado realizado y flujos cobrados, no la ganancia no realizada de posiciones que sigan abiertas (no tenemos precios históricos día por día para aislar eso). El % y la TNA usan como base el capital que había invertido al inicio de cada año.</div>';
+
+  // Conciliación: suma de todos los años (realizado+flujos) + no realizado de hoy = ganancia total (Evolución de la cartera)
+  var sumaAnos=anos.reduce(function(s,a){return s+a.nominal;},0);
+  var pos=Object.values(d.posiciones).filter(function(p){return p.cantTotal>0;});
+  var tcHoyVal=tcHoy();
+  var tARS=0,cARS=0;
+  pos.forEach(function(p){var pr=d.precios[p.ticker];cARS+=p.costoTotalARS||0;tARS+=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);});
+  var noRealizado=isU?(tARS/tcHoyVal)-(cARS/tcHoyVal):tARS-cARS;
+  var ganTotal=sumaAnos+noRealizado;
+  h+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">'
+    +'<div class="rs" style="margin-bottom:0"><div class="rsi"><div class="rsl">Suma de años</div><div class="rsv">'+fx(sumaAnos)+'</div></div><div class="rsi"><div class="rsl">+ No realizado hoy</div><div class="rsv">'+fx(noRealizado)+'</div></div><div class="rsi"><div class="rsl">= Ganancia total</div><div class="rsv '+cc(ganTotal)+'">'+fx(ganTotal)+'</div></div></div>'
+    +'</div>';
+  h+='<div style="font-size:10.5px;color:var(--t3);margin-top:10px;line-height:1.4">El año en curso queda <b>parcial</b>: solo suma resultado realizado y flujos cobrados, no la ganancia no realizada de posiciones que sigan abiertas (no tenemos precios históricos día por día para aislar eso, sea cuando sea que se hayan comprado). Por eso la suma de los años sola no coincide con la Ganancia total de "Evolución de la cartera" — falta sumarle el No realizado de hoy, que se muestra arriba. El % y la TNA de cada año usan como base el capital que había invertido al inicio de ese año.</div>';
   el.innerHTML=h;
 }
 
