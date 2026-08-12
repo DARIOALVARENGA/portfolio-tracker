@@ -1285,8 +1285,40 @@ function renderPos(){
   var tcHoyVal=tcHoy();
   var isU=viewCcy==='USD';
   var fx=isU?fU:fP;
+
+  // Gráfico de rendimiento % por posición
+  var conRend=[];
+  pos.forEach(function(p){
+    var pr=d.precios[p.ticker];
+    if(!pr)return;
+    var cA=calcValorActualARS(pr,p.cantTotal,p.tipo);
+    var invARS=p.costoTotalARS||0,fl=p.flujosARS||0;
+    var rendPct=invARS>0?((cA+fl-invARS)/invARS)*100:null;
+    if(rendPct!=null)conRend.push({ticker:p.ticker,pct:rendPct});
+  });
+  var chartHtml='';
+  if(conRend.length){
+    conRend.sort(function(a,b){return b.pct-a.pct;});
+    var maxAbsR=conRend.reduce(function(m,x){return Math.max(m,Math.abs(x.pct));},1);
+    chartHtml='<div class="card" style="margin-bottom:14px"><div class="ch"><span class="ct">Rendimiento % por posición</span></div><div class="cb">';
+    conRend.forEach(function(x){
+      var w=Math.min(50,Math.abs(x.pct)/maxAbsR*50);
+      var color=x.pct>=0?'var(--pos)':'var(--neg)';
+      var side=x.pct>=0?'left':'right';
+      chartHtml+='<div style="display:flex;align-items:center;margin-bottom:9px;font-size:12px">'
+        +'<div style="width:70px;font-weight:700">'+x.ticker+'</div>'
+        +'<div style="flex:1;position:relative;height:14px;background:var(--sf2);border-radius:3px">'
+        +'<div style="position:absolute;left:50%;top:-2px;width:1px;height:18px;background:var(--bd2)"></div>'
+        +'<div style="position:absolute;'+side+':50%;top:1px;height:12px;width:'+w+'%;background:'+color+';border-radius:2px"></div>'
+        +'</div>'
+        +'<div style="width:80px;text-align:right;font-weight:700;color:'+color+'">'+fPct(x.pct)+'</div>'
+        +'</div>';
+    });
+    chartHtml+='</div></div>';
+  }
+
   var NC=d.isCon?11:10;
-  var h='<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual</th><th style="text-align:right">Cartera</th><th style="text-align:right">Inv.</th><th style="text-align:right">Rend.</th><th style="text-align:right">Rend.%</th><th style="text-align:right">TNA</th></tr></thead><tbody>';
+  var h=chartHtml+'<div class="tw"><table><thead><tr><th style="width:24px"></th><th>Símbolo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th style="text-align:right">Nominales</th><th style="text-align:right">Días</th><th style="text-align:right">P.Actual</th><th style="text-align:right">Cartera</th><th style="text-align:right">Inv.</th><th style="text-align:right">Rend.</th><th style="text-align:right">Rend.%</th><th style="text-align:right">TNA</th></tr></thead><tbody>';
   var totCartARS=0,totInvARS=0,totRendARS=0,sumDiasPonderado=0;
   orden.filter(function(t){return grupos[t];}).forEach(function(tipo){
     var items=grupos[tipo].sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);});
