@@ -230,6 +230,7 @@ input[type=file]{display:none}
       <div class="card"><div class="ch"><span class="ct">Evolución de la cartera</span></div><div class="cb" id="top-b"><div class="empty"><p>Sin datos</p></div></div></div>
     </div>
     <div class="card"><div class="ch"><span class="ct">Resumen posiciones</span></div><div id="res-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
+    <div class="card"><div class="ch"><span class="ct">Rentabilidad por año</span></div><div id="anual-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
   </div>
 
   <div id="tab-pos" class="tp">
@@ -1064,7 +1065,7 @@ function calcC(c){
 // ═══ RENDER ═══
 function renderAll(){
   var d=getData();
-  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderPos();renderHist();renderBol();renderFlujos();
+  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderAnual(d);renderPos();renderHist();renderBol();renderFlujos();
   var cb=g('conban');
   if(d.isCon&&Object.keys(clients).length){cb.style.display='flex';g('conct').textContent='Vista consolidada — '+Object.keys(clients).length+' clientes';}
   else cb.style.display='none';
@@ -1250,6 +1251,35 @@ function renderRes(d){
   h+='</tbody></table></div>';g('res-b').innerHTML=h;
 }
 
+function renderAnual(d){
+  var el=g('anual-b');
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var conv=isU?toUSD:toARS;
+  var anos=calcRentabilidadPorAno(d,conv,isU);
+  if(!anos.length){el.innerHTML='<div class="empty"><p>Sin datos</p></div>';return;}
+  var maxAbs=anos.reduce(function(m,a){return Math.max(m,Math.abs(a.nominal));},1);
+  var h='';
+  anos.slice().reverse().forEach(function(a){
+    var w=Math.min(50,Math.abs(a.nominal)/maxAbs*50);
+    var color=a.nominal>=0?'var(--pos)':'var(--neg)';
+    var side=a.nominal>=0?'left':'right';
+    h+='<div style="display:flex;align-items:center;margin-bottom:9px;font-size:12px">'
+      +'<div style="width:48px;font-weight:700">'+a.ano+(a.esActual?'<span style="color:var(--t3);font-size:9px;display:block;font-weight:400">(parcial)</span>':'')+'</div>'
+      +'<div style="flex:1;position:relative;height:14px;background:var(--sf2);border-radius:3px">'
+      +'<div style="position:absolute;left:50%;top:-2px;width:1px;height:18px;background:var(--bd2)"></div>'
+      +'<div style="position:absolute;'+side+':50%;top:1px;height:12px;width:'+w+'%;background:'+color+';border-radius:2px"></div>'
+      +'</div>'
+      +'<div style="width:90px;text-align:right;font-weight:700;color:'+color+'">'+fx(a.nominal)+'</div>'
+      +'<div style="width:64px;text-align:right;font-weight:600;color:'+color+'">'+(a.retPct!=null?fPct(a.retPct):'—')+'</div>'
+      +'<div style="width:64px;text-align:right;color:var(--t3)">'+(a.tna!=null?fTNA(a.tna):'—')+'</div>'
+      +'</div>';
+  });
+  h+='<div style="display:flex;font-size:10px;color:var(--t3);padding-top:4px;border-top:1px solid var(--bd)"><div style="width:48px"></div><div style="flex:1"></div><div style="width:90px;text-align:right">Nominal</div><div style="width:64px;text-align:right">Retorno</div><div style="width:64px;text-align:right">TNA</div></div>';
+  h+='<div style="font-size:10.5px;color:var(--t3);margin-top:10px;line-height:1.4">El año en curso queda <b>parcial</b>: solo suma resultado realizado y flujos cobrados, no la ganancia no realizada de posiciones que sigan abiertas (no tenemos precios históricos día por día para aislar eso). El % y la TNA usan como base el capital que había invertido al inicio de cada año.</div>';
+  el.innerHTML=h;
+}
+
 function calcCapitalPico(compras,ventas,flujos,convFn){
   var eventos=[];
   compras.forEach(function(b){eventos.push({fecha:b.conc,delta:-convFn(b.neto,b.moneda,b.conc)});});
@@ -1270,6 +1300,56 @@ function calcCapitalDepositado(depositos,convFn){
   var cum=0,pico=0;
   eventos.forEach(function(e){cum+=e.delta;if(cum>pico)pico=cum;});
   return {pico:pico,cumFinal:cum};
+}
+
+// Rentabilidad por año calendario: resultado nominal (realizado + flujos cobrados, EXCLUYE no realizado
+// de posiciones que sigan abiertas, porque no tenemos precios históricos día por día), % y TNA,
+// usando como base el capital que había invertido al inicio del año (o el pico dentro del año si
+// el capital inicial es chico/cero, para el primer año parcial).
+function calcRentabilidadPorAno(d,convFn,esUSD){
+  var depositos=d.depositos||[];
+  var usaDep=depositos.length>0;
+  var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
+  var ventas=(d.boletos||[]).filter(function(b){return b.tipo==='VENTA';});
+  var flujosR=(d.flujos||[]).filter(function(f){return f.tipo!=='Amortización';});
+
+  var eventos=[];
+  if(usaDep){
+    depositos.forEach(function(dp){eventos.push({fecha:dp.fecha,delta:dp.signo*convFn(dp.monto,dp.moneda,dp.fecha)});});
+  }else{
+    compras.forEach(function(b){eventos.push({fecha:b.conc,delta:-convFn(b.neto,b.moneda,b.conc)});});
+    ventas.forEach(function(b){eventos.push({fecha:b.conc,delta:convFn(b.neto,b.moneda,b.conc)});});
+    flujosR.forEach(function(f){eventos.push({fecha:f.fecha,delta:convFn(f.importe,f.moneda,f.fecha)});});
+  }
+  eventos.sort(function(a,b){if(a.fecha!==b.fecha)return a.fecha.localeCompare(b.fecha);return b.delta-a.delta;});
+  if(!eventos.length)return [];
+
+  var anoInicio=parseInt(eventos[0].fecha.substring(0,4));
+  var anoActual=new Date().getFullYear();
+  var hoy=new Date().toISOString().substring(0,10);
+  var out=[];
+  var cum=0,idx=0;
+  for(var y=anoInicio;y<=anoActual;y++){
+    var desde=y+'-01-01',hasta=(y+1)+'-01-01';
+    var capInicio=usaDep?cum:-cum;
+    var pico=capInicio;
+    while(idx<eventos.length&&eventos[idx].fecha<hasta){
+      cum+=eventos[idx].delta;
+      var val=usaDep?cum:-cum;
+      if(val>pico)pico=val;
+      idx++;
+    }
+    var capBase=Math.max(capInicio,pico,0);
+    var realizadoAno=d.opsCerradas.filter(function(o){return o.fechaVenta>=desde&&o.fechaVenta<hasta;}).reduce(function(s,o){return s+(esUSD?o.ganUSD:o.ganARS);},0);
+    var flujosAno=flujosR.filter(function(f){return f.fecha>=desde&&f.fecha<hasta;}).reduce(function(s,f){return s+convFn(f.importe,f.moneda,f.fecha);},0);
+    var nominal=realizadoAno+flujosAno;
+    var esActual=y===anoActual;
+    var diasEnAno=esActual?dds(desde,hoy):dds(desde,hasta);
+    var retPct=capBase>0?(nominal/capBase)*100:null;
+    var tna=retPct!=null&&diasEnAno>0?(retPct/diasEnAno)*365:null;
+    out.push({ano:y,nominal:nominal,capBase:capBase,retPct:retPct,tna:tna,esActual:esActual});
+  }
+  return out;
 }
 
 
