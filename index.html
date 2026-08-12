@@ -225,14 +225,6 @@ input[type=file]{display:none}
   <div class="content">
   <div id="tab-dash" class="tp on">
     <div id="conban" class="con-ban" style="display:none"><strong id="conct"></strong></div>
-    <div class="krow">
-      <div class="kpi acc"><div class="kl">Cartera total</div><div class="kv dim" id="k-tot">—</div><div class="ks">ARS estimado</div></div>
-      <div class="kpi"><div class="kl">Costo invertido</div><div class="kv dim" id="k-cos">—</div><div class="ks">Base ARS</div></div>
-      <div class="kpi"><div class="kl">Result. no realizado</div><div class="kv dim" id="k-gan">—</div><div class="ks" id="k-ganp">—</div></div>
-      <div class="kpi"><div class="kl">Posiciones abiertas</div><div class="kv dim" id="k-pos">—</div><div class="ks" id="k-ops">—</div></div>
-      <div class="kpi"><div class="kl">Result. realizado</div><div class="kv dim" id="k-real">—</div><div class="ks" id="k-rusd">—</div></div>
-      <div class="kpi"><div class="kl">Flujos cobrados</div><div class="kv dim" id="k-fl">—</div><div class="ks" id="k-fls">—</div></div>
-    </div>
     <div class="two">
       <div class="card"><div class="ch"><span class="ct">Distribución</span></div><div class="cb" id="dist-b"><div class="empty"><p>Sin datos</p></div></div></div>
       <div class="card"><div class="ch"><span class="ct">Evolución de la cartera</span></div><div class="cb" id="top-b"><div class="empty"><p>Sin datos</p></div></div></div>
@@ -1092,26 +1084,9 @@ function setViewCcy(m){
 }
 function fCcy(vARS,vUSD){return viewCcy==='USD'?('US$'+fU(vUSD)):fP(vARS);}
 function renderKPIs(d){
-  var posiciones=d.posiciones,precios=d.precios,opsCerradas=d.opsCerradas,flujos=d.flujos;
-  var tARS=0,cARS=0,cnt=0;
-  Object.values(posiciones).filter(function(p){return p.cantTotal>0;}).forEach(function(p){
-    cnt++;
-    var pr=precios[p.ticker];
-    cARS+=p.costoTotalARS||0;
-    tARS+=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);
-  });
-  var tcHoyVal=tcHoy();
-  var tUSD=tARS/tcHoyVal,cUSD=cARS/tcHoyVal;
-  var gan=tARS-cARS,rp=cARS>0?(gan/cARS)*100:0,ganUSD=tUSD-cUSD;
+  var opsCerradas=d.opsCerradas;
   var rARS=opsCerradas.reduce(function(s,o){return s+o.ganARS;},0);
   var rUSD=opsCerradas.reduce(function(s,o){return s+o.ganUSD;},0);
-  var flujosR=flujos.filter(function(f){return f.tipo!=='Amortización';});
-  var flARS=flujosR.reduce(function(s,f){return s+f.importeARS;},0);
-  var flUSD=flujosR.reduce(function(s,f){return s+toUSD(f.importe,f.moneda,f.fecha);},0);
-  sv('k-tot',fCcy(tARS,tUSD));sv('k-cos',fCcy(cARS,cUSD));sv('k-gan',fCcy(gan,ganUSD),cc(gan));
-  g('k-ganp').textContent=fPct(rp);sv('k-pos',cnt);g('k-ops').textContent='';
-  sv('k-real',fCcy(rARS,rUSD),cc(rARS));g('k-rusd').textContent=fU(rUSD);
-  sv('k-fl',fCcy(flARS,flUSD),'pos');g('k-fls').textContent=flujosR.length+' cobros';
   sa('rs-tot',fCcy(rARS,rUSD),cc(rARS));
   var flTot=opsCerradas.reduce(function(s,o){return s+(o.flujosARS||0);},0);
   sa('rs-fl',fP(flTot));g('rs-ops').textContent=opsCerradas.length;
@@ -1122,14 +1097,25 @@ function renderKPIs(d){
 function renderDist(d){
   var pos=Object.values(d.posiciones).filter(function(p){return p.cantTotal>0;});
   if(!pos.length){g('dist-b').innerHTML='<div class="empty"><p>Sin datos</p></div>';return;}
-  var by={};
-  pos.forEach(function(p){by[p.tipo]=(by[p.tipo]||0)+(p.costoTotalARS||0);});
-  var tot=Object.values(by).reduce(function(s,v){return s+v;},0);
-  var h='';
+  var isU=viewCcy==='USD';
+  var fx=isU?fU:fP;
+  var tcHoyVal=tcHoy();
+  var by={},tARS=0;
+  pos.forEach(function(p){
+    var pr=d.precios[p.ticker];
+    var va=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);
+    by[p.tipo]=(by[p.tipo]||0)+va;
+    tARS+=va;
+  });
+  var h='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bd)">'
+    +'<span style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Cartera total</span>'
+    +'<span style="font-size:20px;font-weight:800">'+fx(isU?tARS/tcHoyVal:tARS)+'</span>'
+    +'</div>';
   Object.entries(by).sort(function(a,b){return b[1]-a[1];}).forEach(function(e){
     var tipo=e[0],val=e[1];
-    var pct=tot>0?(val/tot*100):0;
-    h+='<div class="dr"><div class="dl">'+tipo+'</div><div class="dt"><div class="df" style="width:'+pct.toFixed(1)+'%;background:'+(TCOLORS[tipo]||'#888')+'"></div></div><div class="dp">'+pct.toFixed(1)+'%</div><div class="dv">'+fP(val)+'</div></div>';
+    var pct=tARS>0?(val/tARS*100):0;
+    var valV=isU?val/tcHoyVal:val;
+    h+='<div class="dr"><div class="dl">'+tipo+'</div><div class="dt"><div class="df" style="width:'+pct.toFixed(1)+'%;background:'+(TCOLORS[tipo]||'#888')+'"></div></div><div class="dp">'+pct.toFixed(1)+'%</div><div class="dv">'+fx(valV)+'</div></div>';
   });
   g('dist-b').innerHTML=h;
 }
@@ -1219,6 +1205,7 @@ function renderRes(d){
   var fx=isU?fU:fP;
   var tcHoyVal=tcHoy();
   var h='<div class="tw"><table><thead><tr><th>Ticker</th><th>Tipo</th>'+(d.isCon?'<th>Cliente</th>':'')+'<th>Nominales</th><th>Costo</th><th>Cartera</th><th>Rend.</th><th>Rend.%</th><th>TNA</th></tr></thead><tbody>';
+  var totCA=0,totVa=0,totGan=0,sumDiasPond=0;
   pos.sort(function(a,b){return (b.costoTotalARS||0)-(a.costoTotalARS||0);}).forEach(function(p){
     var pr=d.precios[p.ticker];
     var va=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):null;
@@ -1231,8 +1218,16 @@ function renderRes(d){
     var cAV=isU?cA/tcHoyVal:cA;
     var vaV=isU&&va!=null?va/tcHoyVal:va;
     var ganV=isU&&gan!=null?gan/tcHoyVal:gan;
+    totCA+=cA;totVa+=va!=null?va:cA;totGan+=gan!=null?gan:0;sumDiasPond+=(p.diasProm||0)*cA;
     h+='<tr><td><strong>'+p.ticker+'</strong></td><td><span class="'+pc(p.tipo)+'">'+p.tipo+'</span></td>'+(d.isCon?'<td><span class="pill pcl">'+cn+'</span></td>':'')+'<td class="num">'+p.cantTotal.toLocaleString('es-AR')+'</td><td class="num">'+fx(cAV)+'</td><td class="num">'+(vaV!=null?fx(vaV):'—')+'</td><td class="num '+(ganV!=null?cc(ganV):'')+'">'+(ganV!=null?fx(ganV):'—')+'</td><td class="'+(r!=null?cc(r):'')+'">'+(r!=null?fPct(r):'—')+'</td><td class="'+(t_!=null?cc(t_):'')+'">'+(t_!=null?fTNA(t_):'—')+'</td></tr>';
   });
+  var totR=totCA>0?(totGan/totCA)*100:null;
+  var diasPond=totCA>0?sumDiasPond/totCA:0;
+  var totTNA=totR!=null&&diasPond>0?(totR/diasPond)*365:null;
+  var totCAV=isU?totCA/tcHoyVal:totCA;
+  var totVaV=isU?totVa/tcHoyVal:totVa;
+  var totGanV=isU?totGan/tcHoyVal:totGan;
+  h+='<tr style="background:var(--sf2);font-weight:800;border-top:2px solid var(--bd2)"><td>TOTAL</td><td></td>'+(d.isCon?'<td></td>':'')+'<td></td><td class="num">'+fx(totCAV)+'</td><td class="num">'+fx(totVaV)+'</td><td class="num '+cc(totGanV)+'">'+fx(totGanV)+'</td><td class="'+(totR!=null?cc(totR):'')+'">'+(totR!=null?fPct(totR):'—')+'</td><td class="'+(totTNA!=null?cc(totTNA):'')+'">'+(totTNA!=null?fTNA(totTNA):'—')+'</td></tr>';
   h+='</tbody></table></div>';g('res-b').innerHTML=h;
 }
 
