@@ -1104,20 +1104,39 @@ function renderDist(d){
   pos.forEach(function(p){
     var pr=d.precios[p.ticker];
     var va=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);
-    by[p.tipo]=(by[p.tipo]||0)+va;
+    if(!by[p.tipo])by[p.tipo]={val:0,n:0};
+    by[p.tipo].val+=va;by[p.tipo].n++;
     tARS+=va;
   });
-  var h='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bd)">'
-    +'<span style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Cartera total</span>'
-    +'<span style="font-size:20px;font-weight:800">'+fx(isU?tARS/tcHoyVal:tARS)+'</span>'
-    +'</div>';
-  Object.entries(by).sort(function(a,b){return b[1]-a[1];}).forEach(function(e){
-    var tipo=e[0],val=e[1];
-    var pct=tARS>0?(val/tARS*100):0;
-    var valV=isU?val/tcHoyVal:val;
-    h+='<div class="dr"><div class="dl">'+tipo+'</div><div class="dt"><div class="df" style="width:'+pct.toFixed(1)+'%;background:'+(TCOLORS[tipo]||'#888')+'"></div></div><div class="dp">'+pct.toFixed(1)+'%</div><div class="dv">'+fx(valV)+'</div></div>';
+  var segs=Object.entries(by).sort(function(a,b){return b[1].val-a[1].val;}).map(function(e){return {tipo:e[0],val:e[1].val,n:e[1].n,color:TCOLORS[e[0]]||'#888'};});
+
+  var size=140,r=size/2-13,cx=size/2,cy=size/2,circ=2*Math.PI*r,offset=0;
+  var svg='<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">';
+  svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--bd2)" stroke-width="20"/>';
+  segs.forEach(function(s){
+    var frac=tARS>0?s.val/tARS:0,len=frac*circ;
+    if(len>0)svg+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+s.color+'" stroke-width="20" stroke-dasharray="'+len.toFixed(1)+' '+(circ-len).toFixed(1)+'" stroke-dashoffset="'+(-offset).toFixed(1)+'" transform="rotate(-90 '+cx+' '+cy+')"/>';
+    offset+=len;
   });
-  g('dist-b').innerHTML=h;
+  svg+='</svg>';
+
+  var donutBlock='<div style="position:relative;width:'+size+'px;height:'+size+'px;flex-shrink:0">'+svg
+    +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">'
+    +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Cartera</div>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--t1)">'+fx(isU?tARS/tcHoyVal:tARS)+'</div></div></div>';
+
+  var legend='<div style="flex:1;min-width:180px">';
+  segs.forEach(function(s){
+    var pct=tARS>0?(s.val/tARS*100):0;
+    var valV=isU?s.val/tcHoyVal:s.val;
+    legend+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)">'
+      +'<div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:10px;height:10px;border-radius:2px;background:'+s.color+';flex-shrink:0;display:inline-block"></span><span style="font-weight:700;font-size:13px">'+s.tipo+'</span><span style="color:var(--t3);font-size:12px">· '+s.n+' pos.</span></div>'
+      +'<div style="text-align:right;flex-shrink:0"><span style="font-weight:700;font-size:13px">'+fx(valV)+'</span><span style="color:var(--t3);font-size:11px;margin-left:8px">'+pct.toFixed(1)+'%</span></div>'
+      +'</div>';
+  });
+  legend+='</div>';
+
+  g('dist-b').innerHTML='<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'+donutBlock+legend+'</div>';
 }
 
 function renderTop(d){
