@@ -238,7 +238,6 @@ input[type=file]{display:none}
       <div class="card"><div class="ch"><span class="ct">Evolución de la cartera</span></div><div class="cb" id="top-b"><div class="empty"><p>Sin datos</p></div></div></div>
     </div>
     <div class="card"><div class="ch"><span class="ct">Resumen posiciones</span></div><div id="res-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
-    <div class="card"><div class="ch"><span class="ct">Evolución de la inversión</span></div><div id="evo-b"><div class="empty"><p>Seleccioná un cliente e importá sus boletos</p></div></div></div>
   </div>
 
   <div id="tab-pos" class="tp">
@@ -1073,7 +1072,7 @@ function calcC(c){
 // ═══ RENDER ═══
 function renderAll(){
   var d=getData();
-  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderEvo(d);renderPos();renderHist();renderBol();renderFlujos();
+  renderKPIs(d);renderDist(d);renderTop(d);renderRes(d);renderPos();renderHist();renderBol();renderFlujos();
   var cb=g('conban');
   if(d.isCon&&Object.keys(clients).length){cb.style.display='flex';g('conct').textContent='Vista consolidada — '+Object.keys(clients).length+' clientes';}
   else cb.style.display='none';
@@ -1191,10 +1190,24 @@ function renderTop(d){
   svg+='<text x="'+px(last.fecha).toFixed(1)+'" y="'+(py(last.val)-9).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--pos)" text-anchor="end">'+fx(last.val)+'</text>';
   svg+='</svg>';
 
+  // Stats de evolución (capital depositado/pico, ganancia, retorno, TNA) debajo del gráfico
+  var fechaInicio=puntos[0].fecha;
+  var dias=dds(fechaInicio,hoy);
+  var ev=usaDep?calcCapitalDepositado(depositos,conv):calcCapitalPico(compras,ventas,d.flujos||[],conv);
+  var puesto=ev.pico;
+  var gan=usaDep?(carteraHoy-ev.cumFinal):(ev.cumFinal+carteraHoy);
+  var recibido=puesto+gan;
+  var ret=puesto>0?(gan/puesto)*100:0;
+  var tna=dias>0?(ret/dias)*365:0;
+  var fechaDisp=new Date(fechaInicio+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
   var h='<div style="padding:4px 2px 0">'+svg+'</div>';
-  h+='<div style="display:flex;justify-content:space-between;padding:8px 2px 0;font-size:11px;color:var(--t3)">'
-    +'<span>'+(usaDep?'Capital depositado (neto)':'Capital en juego (estimado)')+'</span>'
-    +'<span style="color:var(--pos);font-weight:700">● Cartera hoy: '+fx(carteraHoy)+'</span>'
+  h+='<div class="rs" style="margin-top:8px"><div class="rsi"><div class="rsl">Invirtiendo desde</div><div class="rsv">'+fechaDisp+'</div></div><div class="rsi"><div class="rsl">Días</div><div class="rsv">'+dias.toLocaleString('es-AR')+'</div></div><div class="rsi"><div class="rsl">Capital'+(usaDep?' depositado':' pico')+'</div><div class="rsv">'+fx(puesto)+'</div></div><div class="rsi"><div class="rsl">Ganancia</div><div class="rsv '+cc(gan)+'">'+fx(gan)+'</div></div><div class="rsi"><div class="rsl">Retorno</div><div class="rsv '+cc(ret)+'">'+fPct(ret)+'</div></div><div class="rsi"><div class="rsl">TNA</div><div class="rsv '+cc(tna)+'">'+fTNA(tna)+'</div></div></div>';
+  h+='<div style="font-size:10.5px;color:var(--t3);margin-top:8px;line-height:1.4">'
+    +(usaDep
+      ?'<b>Capital depositado</b>: el máximo que el cliente aportó realmente a la cuenta (transferencias reales, según la Cuenta Corriente).'
+      :'<b>Capital pico</b> (estimado): sin depósitos reales detectados, se reconstruye por compras/ventas/flujos y puede estar sobreestimado si hubo mucha reinversión.')
+    +' La línea punteada verde muestra la diferencia entre ese capital y el valor real de la cartera hoy — esa distancia es la ganancia.'
     +'</div>';
   el.innerHTML=h;
 }
@@ -1245,71 +1258,6 @@ function calcCapitalDepositado(depositos,convFn){
   return {pico:pico,cumFinal:cum};
 }
 
-function renderEvo(d){
-  var compras=(d.boletos||[]).filter(function(b){return b.tipo==='COMPRA';});
-  var ventas=(d.boletos||[]).filter(function(b){return b.tipo==='VENTA';});
-  if(!compras.length){g('evo-b').innerHTML='<div class="empty"><p>Sin boletos importados</p></div>';return;}
-  var fechaInicio=compras.reduce(function(min,b){return (!min||b.conc<min)?b.conc:min;},null);
-  var hoy=new Date().toISOString().substring(0,10);
-  var dias=dds(fechaInicio,hoy);
-
-  var pos=Object.values(d.posiciones).filter(function(p){return p.cantTotal>0;});
-  var tcHoyVal=tcHoy();
-  var tARS=0;
-  pos.forEach(function(p){var pr=d.precios[p.ticker];tARS+=pr?calcValorActualARS(pr,p.cantTotal,p.tipo):(p.costoTotalARS||0);});
-  var tUSD=tARS/tcHoyVal;
-
-  var flujos=d.flujos||[];
-  var depositos=d.depositos||[];
-  var usaDepositos=depositos.length>0;
-  var evARS,evUSD,puestoARS,puestoUSD,ganARS,ganUSD;
-  if(usaDepositos){
-    // Método correcto: capital = depósitos reales a la cuenta (ej. transferencias del cliente)
-    evARS=calcCapitalDepositado(depositos,toARS);evUSD=calcCapitalDepositado(depositos,toUSD);
-    puestoARS=evARS.pico;puestoUSD=evUSD.pico;
-    ganARS=tARS-evARS.cumFinal;ganUSD=tUSD-evUSD.cumFinal;
-  }else{
-    // Respaldo: sin depósitos importados, se estima por compra/venta/flujos (puede sobreestimar si hubo reinversión)
-    evARS=calcCapitalPico(compras,ventas,flujos,toARS);evUSD=calcCapitalPico(compras,ventas,flujos,toUSD);
-    puestoARS=evARS.pico;puestoUSD=evUSD.pico;
-    ganARS=evARS.cumFinal+tARS;ganUSD=evUSD.cumFinal+tUSD;
-  }
-  var recibidoARS=puestoARS+ganARS,recibidoUSD=puestoUSD+ganUSD;
-
-  var retARS=puestoARS>0?(ganARS/puestoARS)*100:0;
-  var retUSD=puestoUSD>0?(ganUSD/puestoUSD)*100:0;
-  var tnaARS=dias>0?(retARS/dias)*365:0;
-  var tnaUSD=dias>0?(retUSD/dias)*365:0;
-  var fechaDisp=new Date(fechaInicio+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
-
-  var h='<div class="rs" style="margin-bottom:2px"><div class="rsi"><div class="rsl">Invirtiendo desde</div><div class="rsv">'+fechaDisp+'</div></div><div class="rsi"><div class="rsl">Días transcurridos</div><div class="rsv">'+dias.toLocaleString('es-AR')+'</div></div></div>';
-  h+='<div style="margin-top:10px">';
-  [['ARS',puestoARS,recibidoARS,ganARS,retARS,tnaARS,fP],['USD',puestoUSD,recibidoUSD,ganUSD,retUSD,tnaUSD,fU]].filter(function(m){return m[0]===viewCcy;}).forEach(function(m){
-    var mon=m[0],puesto=m[1],recibido=m[2],gan=m[3],ret=m[4],tna=m[5],fmt=m[6];
-    h+='<div class="card" style="margin-bottom:0">';
-    h+='<div class="ch"><span class="ct">Evolución en '+mon+'</span></div>';
-    h+='<div class="rs">';
-    h+='<div class="rsi"><div class="rsl">Capital'+(usaDepositos?' depositado':' pico')+'</div><div class="rsv">'+fmt(puesto)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">Cartera actual + ventas y cobros</div><div class="rsv">'+fmt(recibido)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">Ganancia</div><div class="rsv '+cc(gan)+'">'+fmt(gan)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">Retorno total</div><div class="rsv '+cc(ret)+'">'+fPct(ret)+'</div></div>';
-    h+='<div class="rsi"><div class="rsl">TNA</div><div class="rsv '+cc(tna)+'">'+fTNA(tna)+'</div></div>';
-    h+='</div></div>';
-  });
-  h+='</div>';
-  if(usaDepositos){
-    h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
-      +'<b>Capital depositado</b>: el máximo que el cliente aportó realmente a la cuenta (transferencias reales, según la Cuenta Corriente), no lo que se compró/vendió internamente. '
-      +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo vendido o cobrado en el camino, esté o no reinvertido. La diferencia entre ambos es la ganancia total.'
-      +'</div>';
-  }else{
-    h+='<div style="font-size:11px;color:var(--muted,#8a8680);margin-top:10px;line-height:1.5">'
-      +'<b>Capital pico</b> (estimado): no se detectaron depósitos reales en la Cuenta Corriente, así que este número se reconstruye a partir de compras/ventas/flujos y puede estar un poco sobreestimado si hubo mucha reinversión. '
-      +'<b>Cartera actual + ventas y cobros</b>: valor de la cartera hoy más todo lo vendido o cobrado en el camino. La diferencia entre ambos es la ganancia total.'
-      +'</div>';
-  }
-  g('evo-b').innerHTML=h;
-}
 
 function renderPos(){
   var d=getData();
