@@ -1036,7 +1036,7 @@ function calcC(c){
     ventas.forEach(function(v){
       var cv=v.cant,costoARS=0,costoUSD=0,costoOrig=0,tieneFX=false;
       for(var i=0;i<cola.length&&cv>0;i++){
-        if(cola[i].cr<=0)continue;
+        if(cola[i].cr<=0||cola[i].conc>v.conc)continue;
         var m=Math.min(cv,cola[i].cr);
         var nu=cola[i].neto/cola[i].cant;
         costoOrig+=m*nu;
